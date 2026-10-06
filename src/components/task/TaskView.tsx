@@ -1,6 +1,6 @@
 "use client";
 
-import { Marked } from "@/components/Marked";
+import { Marked, Shape } from "@/components/Marked";
 import type { Answer, TaskDTO } from "@/lib/types";
 
 export type Response = string | Record<string, string> | null;
@@ -22,7 +22,10 @@ function Cell({
   onClick,
   disabled,
   ariaLabel,
+  compact = false,
 }: {
+  /** Smaller on desktop (pointer input); phones keep the 44px touch target. */
+  compact?: boolean;
   label?: string;
   marked: boolean;
   state: "none" | "right" | "wrong" | "missed";
@@ -48,7 +51,7 @@ function Cell({
       aria-pressed={marked}
       disabled={disabled}
       onClick={onClick}
-      className={`relative grid size-11 shrink-0 place-items-center rounded-lg border-2 font-display text-sm transition-colors ${look} ${disabled ? "cursor-default" : "hover:bg-paper-2"}`}
+      className={`relative grid size-11 shrink-0 place-items-center rounded-lg border-2 font-display text-sm transition-colors ${compact ? "md:size-9" : ""} ${look} ${disabled ? "cursor-default" : "hover:bg-paper-2"}`}
     >
       {label && <span className={marked || showCheck ? "opacity-0" : "text-ink-soft"}>{label}</span>}
       {showCheck ? (
@@ -106,54 +109,57 @@ function Matching({ task, value, onChange, answer, locked }: Props) {
   const key = answer && typeof answer === "object" ? answer : undefined;
   const items = task.items ?? {};
   const letters = Object.keys(task.options);
+  // Desktop: numbered items on the left; lettered options with the answer grid right under them,
+  // so the whole task fits one screen. Phones: everything stacks.
   return (
-    <div className="mt-5 space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        <ol className="space-y-2">
-          {Object.entries(items).map(([n, text]) => (
-            <li key={n} className="flex gap-2 text-[16px]">
-              <span className="font-display font-bold">{n}</span>
-              <Marked text={text} />
-            </li>
-          ))}
-        </ol>
-        <ul className="space-y-2">
+    <div className="mt-4 grid gap-5 md:grid-cols-2 md:gap-8">
+      <ol className="space-y-1.5">
+        {Object.entries(items).map(([n, text]) => (
+          <li key={n} className="flex gap-2 text-[16px] leading-snug">
+            <span className="font-display font-bold">{n}</span>
+            <Marked text={text} />
+          </li>
+        ))}
+      </ol>
+      <div className="space-y-4">
+        <ul className="space-y-1.5">
           {Object.entries(task.options).map(([l, text]) => (
-            <li key={l} className="flex gap-2 text-[16px]">
+            <li key={l} className="flex gap-2 text-[16px] leading-snug">
               <span className="font-display font-bold">{l}</span>
               <Marked text={text} />
             </li>
           ))}
         </ul>
-      </div>
 
-      {/* The answer grid, as on the NMT sheet: one mark per row. */}
-      <div className="inline-block rounded-md border border-grid p-3">
-        <div className="grid gap-1.5" style={{ gridTemplateColumns: `2rem repeat(${letters.length}, 2.75rem)` }}>
-          <span />
-          {letters.map((l) => (
-            <span key={l} className="text-center font-display text-sm">
-              {l}
-            </span>
-          ))}
-          {Object.keys(items).map((n) => (
-            <div key={n} className="contents">
-              <span className="self-center font-display text-sm font-bold">{n}</span>
-              {letters.map((l) => {
-                const chosen = resp[n] === l;
-                return (
-                  <Cell
-                    key={l}
-                    marked={chosen}
-                    state={cellState(l, chosen, key?.[n])}
-                    disabled={locked}
-                    onClick={() => onChange({ ...resp, [n]: l })}
-                    ariaLabel={`Пункт ${n}, варіант ${l}`}
-                  />
-                );
-              })}
-            </div>
-          ))}
+        {/* The answer grid, as on the NMT sheet: one mark per row. */}
+        <div className="inline-block rounded-md border border-grid p-2.5">
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: `1.5rem repeat(${letters.length}, auto)` }}>
+            <span />
+            {letters.map((l) => (
+              <span key={l} className="text-center font-display text-sm">
+                {l}
+              </span>
+            ))}
+            {Object.keys(items).map((n) => (
+              <div key={n} className="contents">
+                <span className="self-center font-display text-sm font-bold">{n}</span>
+                {letters.map((l) => {
+                  const chosen = resp[n] === l;
+                  return (
+                    <Cell
+                      key={l}
+                      compact
+                      marked={chosen}
+                      state={cellState(l, chosen, key?.[n])}
+                      disabled={locked}
+                      onClick={() => onChange({ ...resp, [n]: l })}
+                      ariaLabel={`Пункт ${n}, варіант ${l}`}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -168,7 +174,9 @@ export function TaskView(props: Props) {
         <div className="mb-5 space-y-1.5 rounded-md bg-paper-2 p-4 text-[16px]">
           {task.passage.map((s, i) => (
             <p key={i}>
-              <span className="mr-2 font-display">{s.shape}</span>
+              <span className="mr-2">
+                <Shape char={s.shape} />
+              </span>
               <Marked text={s.text} />
             </p>
           ))}

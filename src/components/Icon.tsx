@@ -13,6 +13,8 @@ const PATHS = {
   down: "M12 5v14M6 13l6 6 6-6",
   home: "M4 11l8-7 8 7v9H4v-9Z",
   grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4",
+  moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z",
   sheet: "M6 3h12v18H6zM9 7h6M9 11h6M9 15h3",
   play: "M8 5l11 7-11 7V5Z",
 } as const;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./Icon";
+import { ThemeToggle } from "./ThemeToggle";
 
 const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: "/dashboard", label: "Головна", icon: "home" },
@@ -29,7 +30,7 @@ export function Nav() {
           <Link href="/dashboard" className="font-display text-lg font-bold tracking-tight">
             Бланк
           </Link>
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex items-center gap-1">
             {ITEMS.map((i) => (
               <Link
                 key={i.href}
@@ -40,8 +41,16 @@ export function Nav() {
                 {i.label}
               </Link>
             ))}
+            <ThemeToggle className="ml-2" />
           </div>
         </nav>
+      </header>
+      {/* Mobile: slim top bar for the logo and theme switch */}
+      <header className="flex items-center justify-between border-b border-grid px-4 py-1.5 md:hidden">
+        <Link href="/dashboard" className="font-display text-lg font-bold tracking-tight">
+          Бланк
+        </Link>
+        <ThemeToggle />
       </header>
       {/* Mobile: bottom bar */}
       <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-grid bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">

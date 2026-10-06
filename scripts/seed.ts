@@ -26,8 +26,10 @@ interface RawFile {
 // Rare or catch-all categories are excluded from the diagnostic and from mastery-driven picks.
 const MIN_TASKS_FOR_DIAGNOSTIC = 5;
 
-function normalizeOption(o: RawOption): string {
+function normalizeOption(o: RawOption, hasPassage: boolean): string {
   if (typeof o === "string") return o.trim();
+  // The passage above already shows each sentence next to its figure, so the option is just the figures (as on the sheet).
+  if (hasPassage) return o.sentences.trim();
   return `${o.sentences}: ${o.text.split(" | ").join("\n")}`.trim();
 }
 
@@ -71,7 +73,7 @@ async function main() {
           let question = t.question ?? "";
           let options: Record<string, string> | null = null;
           if (t.options) {
-            options = Object.fromEntries(Object.entries(t.options).map(([k, v]) => [k, normalizeOption(v)]));
+            options = Object.fromEntries(Object.entries(t.options).map(([k, v]) => [k, normalizeOption(v, !!t.passage?.length)]));
           } else if (t.text) {
             const parsed = parseInlineOptions(t.text);
             if (parsed) ({ question, options } = parsed);
@@ -93,6 +95,11 @@ async function main() {
       }
     }
   }
+
+  // PDF extraction turns the sheet's figures (△ ◇ □ ○ ▽) into Wingdings private-use codes or a combining
+  // triangle, which render as junk. Fix them in the source JSON (against the PDF) rather than seeding garbage.
+  const junk = tasks.filter((t) => /[\uE000-\uF8FF\u20E4]/u.test(JSON.stringify(t))).map((t) => t.id);
+  if (junk.length) throw new Error(`Unrenderable PDF symbols in tasks: ${junk.join(", ")}`);
 
   // Position statistics, computed from the tasks themselves.
   const sessionsAtPosition = new Map<number, Set<string>>();

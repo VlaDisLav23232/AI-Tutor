@@ -1,4 +1,5 @@
 @import "tailwindcss";
+/* Fixel (Text + Display) is loaded in app/layout.tsx via next/font/local, which sets --font-fixel-*. */
 
 /* Answer-sheet palette: paper, ballpoint ink, notebook grid, highlighter, teacher's pen. */
 :root {
@@ -7,7 +8,8 @@
   --ink: #1b2a6b;
   --ink-soft: #4a5788;
   --grid: #c9d3ea;
-  --marker: #ffe45c;
+  --marker: #86c0f6;
+  --on-marker: #1b2a6b;
   --bad: #d2302c;
   --good: #1e7a4c;
   --on-ink: #ffffff;
@@ -19,14 +21,16 @@
   --card: #ffffff;
 }
 
+/* Dark palette: follows the system unless the user picked a theme (data-theme on <html>, from the theme cookie). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #10162e;
     --paper-2: #18203f;
     --ink: #e6eaf7;
     --ink-soft: #a9b3d6;
     --grid: #33406e;
-    --marker: #8a7414;
+    --marker: #f2cf3c;
+    --on-marker: #10162e;
     --bad: #ff6b63;
     --good: #4cc98a;
     --on-ink: #10162e;
@@ -35,8 +39,37 @@
     --lvl-strong: #45c987;
     --flame: #ff8a3d;
     --card: #161d3a;
+    color-scheme: dark;
   }
 }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10162e;
+  --paper-2: #18203f;
+  --ink: #e6eaf7;
+  --ink-soft: #a9b3d6;
+  --grid: #33406e;
+  --marker: #3c7ff2;
+  --on-marker: #10162e;
+  --bad: #ff6b63;
+  --good: #4cc98a;
+  --on-ink: #10162e;
+  --lvl-weak: #ff6b6f;
+  --lvl-ok: #f3b43a;
+  --lvl-strong: #45c987;
+  --flame: #ff8a3d;
+  --card: #161d3a;
+}
+
+/* Show an element only in the effective theme (used by the theme toggle's icons). */
+.when-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .when-dark { display: inline; }
+  :root:not([data-theme="light"]) .when-light { display: none; }
+}
+:root[data-theme="dark"] .when-dark { display: inline; }
+:root[data-theme="dark"] .when-light { display: none; }
 
 @theme inline {
   --color-paper: var(--paper);
@@ -53,8 +86,10 @@
   --color-lvl-strong: var(--lvl-strong);
   --color-flame: var(--flame);
   --color-card: var(--card);
-  --font-display: var(--font-unbounded);
-  --font-text: var(--font-literata);
+  /* Fixel everywhere: Display cut for headings/labels, Text cut for reading. `font-sans` is Fixel too. */
+  --font-display: var(--font-fixel-display);
+  --font-text: var(--font-fixel-text);
+  --font-sans: var(--font-fixel-text);
 }
 
 html {
@@ -65,15 +100,21 @@ html {
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-literata), Georgia, serif;
+  font-family: var(--font-fixel-text);
   line-height: 1.6;
 }
 
-/* Exam-style highlighted fragments (⟦…⟧ in the source): a marker stroke under the text. */
+/* Exam-style highlighted fragments (⟦…⟧ in the source): a highlighter swipe over the whole glyph.
+   Most marks are a single stressed letter. No negative margins: an overlapping fill would paint over the previous letter. */
 .mark {
-  background: linear-gradient(transparent 55%, var(--marker) 55%);
-  font-weight: 600;
-  padding: 0 1px;
+  /* Trim the fill to roughly cap-top..baseline+descent instead of the font's full ascent/descent box. */
+  background: linear-gradient(transparent 14%, var(--marker) 14%, var(--marker) 90%, transparent 90%);
+  color: var(--on-marker);
+  font-weight: 700;
+  padding: 0 0.04em;
+  border-radius: 0.5em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* Notebook grid behind the page header area. */
