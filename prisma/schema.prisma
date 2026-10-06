@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Auth.js ----------
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  xp             Int       @default(0) // unused since XP was removed; kept to avoid a destructive migration
+  streak         Int       @default(0) // consecutive days with the daily goal met, ending at lastActiveDate
+  bestStreak     Int       @default(0)
+  lastActiveDate String? // YYYY-MM-DD (Europe/Kyiv) of the last day the daily goal was met
+  todayDate      String? // unused; daily counts live in DayActivity
+  todayCount     Int       @default(0) // unused; daily counts live in DayActivity
+  createdAt      DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+  runs     TestRun[]
+  attempts Attempt[]
+  mastery  Mastery[]
+  reports  Report[]
+  days     DayActivity[]
+  saved    SavedTask[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ---------- Content ----------
+
+model Category {
+  label          String  @id
+  nameUa         String
+  group          String
+  expectedPoints Float   @default(0) // average test points this topic is worth in one exam
+  positionShares Json // { "1": 0.94, "14": 0.06, ... }
+  inDiagnostic   Boolean @default(true)
+  tasks          Task[]
+}
+
+model Task {
+  id            String   @id
+  categoryLabel String
+  category      Category @relation(fields: [categoryLabel], references: [label])
+  format        String // single | order | matching
+  position      Int?
+  session       String?
+  question      String
+  passage       Json? // [{shape, text}] for sentence order
+  items         Json? // { "1": "...", ... } for matching
+  options       Json // { "А": "...", ... }
+  answer        Json // "Б" or { "1": "Б", ... }
+  source        String   @default("nmt2026") // nmt2026 | generated
+  parentTaskId  String?
+  verified      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  explanation Explanation?
+  attempts    Attempt[]
+  savedBy     SavedTask[]
+
+  @@index([categoryLabel])
+  @@index([parentTaskId])
+}
+
+model Explanation {
+  taskId    String   @id
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  content   Json // { rule, ruleRef, whyCorrect, whyWrong: {letter: text}, perItem? }
+  status    String // verified | needs_review
+  model     String
+  createdAt DateTime @default(now())
+}
+
+// ---------- Progress ----------
+
+model TestRun {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode          String // diagnostic | topic | practice | exam
+  categoryLabel String?
+  taskIds       String[]
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  timeLimitSec  Int?
+  score         Int       @default(0)
+  maxScore      Int       @default(0)
+  attempts      Attempt[]
+
+  @@index([userId, mode])
+}
+
+model Attempt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId     String
+  run       TestRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  response  Json
+  correct   Boolean
+  points    Int
+  maxPoints Int
+  hintsUsed Int      @default(0) // unused since hints were removed; kept to avoid a destructive migration
+  msSpent   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([runId, taskId])
+  @@index([userId, createdAt])
+}
+
+model Mastery {
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryLabel   String
+  value           Float
+  attempts        Int
+  lastPracticedAt DateTime
+  nextReviewAt    DateTime
+  intervalDays    Float    @default(1)
+
+  @@id([userId, categoryLabel])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  kind      String // task | explanation | ai_reply
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+// One row per Claude API call, for the spending cap (AI_BUDGET_USD) and cost reporting.
+model AiUsage {
+  id           String   @id @default(cuid())
+  label        String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+  createdAt    DateTime @default(now())
+}
+
+// Tasks answered per day, for the daily goal and the streak calendar.
+model DayActivity {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date   String // YYYY-MM-DD (Europe/Kyiv)
+  count  Int    @default(0)
+
+  @@id([userId, date])
+}
+
+// ★ favourite ("favorite") or ! "give me this exact task again" ("repeat").
+model SavedTask {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@id([userId, taskId, kind])
+}

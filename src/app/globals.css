@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* Answer-sheet palette: paper, ballpoint ink, notebook grid, highlighter, teacher's pen. */
+:root {
+  --paper: #fbfbf8;
+  --paper-2: #f1f3f9;
+  --ink: #1b2a6b;
+  --ink-soft: #4a5788;
+  --grid: #c9d3ea;
+  --marker: #ffe45c;
+  --bad: #d2302c;
+  --good: #1e7a4c;
+  --on-ink: #ffffff;
+  /* topic levels on the 100–200 scale */
+  --lvl-weak: #e5484d;
+  --lvl-ok: #e09a10;
+  --lvl-strong: #1e9e5a;
+  --flame: #ff6a1a;
+  --card: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #10162e;
+    --paper-2: #18203f;
+    --ink: #e6eaf7;
+    --ink-soft: #a9b3d6;
+    --grid: #33406e;
+    --marker: #8a7414;
+    --bad: #ff6b63;
+    --good: #4cc98a;
+    --on-ink: #10162e;
+    --lvl-weak: #ff6b6f;
+    --lvl-ok: #f3b43a;
+    --lvl-strong: #45c987;
+    --flame: #ff8a3d;
+    --card: #161d3a;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-grid: var(--grid);
+  --color-marker: var(--marker);
+  --color-bad: var(--bad);
+  --color-good: var(--good);
+  --color-on-ink: var(--on-ink);
+  --color-lvl-weak: var(--lvl-weak);
+  --color-lvl-ok: var(--lvl-ok);
+  --color-lvl-strong: var(--lvl-strong);
+  --color-flame: var(--flame);
+  --color-card: var(--card);
+  --font-display: var(--font-unbounded);
+  --font-text: var(--font-literata);
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-literata), Georgia, serif;
+  line-height: 1.6;
+}
+
+/* Exam-style highlighted fragments (⟦…⟧ in the source): a marker stroke under the text. */
+.mark {
+  background: linear-gradient(transparent 55%, var(--marker) 55%);
+  font-weight: 600;
+  padding: 0 1px;
+}
+
+/* Notebook grid behind the page header area. */
+.grid-paper {
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Answer feedback ---------- */
+
+/* Wrong answer: a short, damped shake of the task card. */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+.shake { animation: shake 420ms ease-out; }
+
+/* Correct answer: a soft green halo that fades out. */
+@keyframes glow-good {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 45%, transparent); }
+  100% { box-shadow: 0 0 0 18px transparent; }
+}
+.glow-good { animation: glow-good 700ms ease-out; border-radius: 12px; }
+
+/* The check mark draws itself. */
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.draw-check path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw 380ms 80ms ease-out forwards; }
+
+/* Feedback banner and other things that appear in place. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise 260ms ease-out both; }
+
+/* "+N" floating above a score. */
+@keyframes float-up {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  25% { opacity: 1; transform: translateY(0) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.float-up { animation: float-up 700ms ease-out both; }
+
+/* Combo / streak counters pop when they grow. */
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.pop { animation: pop 320ms ease-out; }
+
+/* The flame flickers gently while the streak is alive. */
+@keyframes flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.06) rotate(-2deg); }
+}
+.flicker { animation: flicker 1.8s ease-in-out infinite; transform-origin: 50% 90%; }
