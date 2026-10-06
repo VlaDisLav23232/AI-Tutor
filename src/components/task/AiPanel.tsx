@@ -26,7 +26,11 @@ export function AiPanel({ taskId, runId, offerSimilar, onSimilar }: Props) {
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: "nearest" }), [turns]);
+  // Braces matter: newer Chrome returns a Promise from scrollIntoView, and React would treat a returned
+  // value as the effect's cleanup function and crash ("destroy is not a function").
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [turns]);
 
   async function ask(question: string) {
     const next: Turn[] = [...turns, { role: "user", content: question }];
