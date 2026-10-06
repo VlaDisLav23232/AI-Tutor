@@ -6,7 +6,6 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { prisma } from "../src/lib/db";
 import { parseInlineOptions, parseMatchingText, stripPageDebris } from "../src/lib/parse";
-import { maxPointsForPosition } from "../src/lib/scoring";
 
 type RawOption = string | { sentences: string; text: string };
 interface RawTask {
@@ -115,20 +114,15 @@ async function main() {
   // Re-running the seed only upserts tasks and categories: students' answers, progress and the
   // (paid) AI explanations are never deleted.
 
-  let totalExpected = 0;
+  // How often each topic appears at each exam position; used to build realistic NMT variants.
   for (const [label, info] of categories) {
     const shares: Record<string, number> = {};
-    let expectedPoints = 0;
     for (const [pos, n] of countAt.get(label) ?? []) {
-      const share = n / sessionsAtPosition.get(pos)!.size;
-      shares[pos] = Math.round(share * 1000) / 1000;
-      expectedPoints += share * maxPointsForPosition(pos);
+      shares[pos] = Math.round((n / sessionsAtPosition.get(pos)!.size) * 1000) / 1000;
     }
-    totalExpected += expectedPoints;
     const data = {
       nameUa: info.nameUa,
       group: info.group,
-      expectedPoints,
       positionShares: shares,
       inDiagnostic: label !== "other" && info.count >= MIN_TASKS_FOR_DIAGNOSTIC,
     };
@@ -150,7 +144,6 @@ async function main() {
 
   console.log(`categories: ${categories.size}`);
   console.log(`tasks: ${tasks.length} (single ${tasks.filter((t) => t.format === "single").length}, order ${tasks.filter((t) => t.format === "order").length}, matching ${tasks.filter((t) => t.format === "matching").length})`);
-  console.log(`expected points across categories: ${totalExpected.toFixed(2)} (should be ≈45)`);
   console.log(`skipped ${skipped.length}: ${skipped.join(", ")}`);
 }
 

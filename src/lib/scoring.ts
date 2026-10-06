@@ -3,10 +3,6 @@ import type { Answer, TaskFormat } from "./types";
 
 export const EXAM_MAX_POINTS = 45; // 25 single-choice × 1 + 5 matching × 4
 
-export function maxPointsForPosition(position: number): number {
-  return position >= 26 ? 4 : 1;
-}
-
 export function maxPointsForFormat(format: TaskFormat): number {
   return format === "matching" ? 4 : 1;
 }
