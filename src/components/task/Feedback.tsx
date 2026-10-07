@@ -85,13 +85,22 @@ export function Feedback({ taskId, response, answer, points, maxPoints }: Props)
 
       {content && (
         <div className="mt-3 space-y-3 text-[16px]">
+          {/* The rule comes first; everything below applies it to the options. */}
+          <div className="rounded-xl bg-card p-3 shadow-[0_0_0_1px_var(--grid)]">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <Icon name="book" className="size-4" /> Правило
+            </p>
+            <p className="mt-1">
+              <Marked text={content.rule} />
+            </p>
+          </div>
           {chosen && chosen !== answer && content.whyWrong[chosen] && (
-            <p className="rounded-md bg-bad/10 p-3">
+            <p className="rounded-xl bg-bad/10 p-3">
               <strong>Чому не {chosen}: </strong>
               <Marked text={content.whyWrong[chosen]} />
             </p>
           )}
-          <p>
+          <p className="rounded-xl bg-good/10 p-3">
             <strong>Чому {typeof answer === "string" ? answer : "так"}: </strong>
             <Marked text={content.whyCorrect} />
           </p>
@@ -112,19 +121,29 @@ export function Feedback({ taskId, response, answer, points, maxPoints }: Props)
               })}
             </ul>
           )}
-          <details className="text-ink-soft">
-            <summary className="cursor-pointer">Правило{content.ruleRef ? ` (${content.ruleRef} Правопису)` : ""} та інші варіанти</summary>
-            <p className="mt-2">{content.rule}</p>
-            <ul className="mt-2 space-y-1">
-              {Object.entries(content.whyWrong)
-                .filter(([l]) => l !== chosen)
-                .map(([l, why]) => (
-                  <li key={l}>
-                    <strong>{l}:</strong> <Marked text={why} />
-                  </li>
-                ))}
-            </ul>
-          </details>
+          {content.tip && (
+            <p className="flex gap-2 rounded-xl bg-marker/30 p-3">
+              <Icon name="bolt" className="mt-0.5 size-4 shrink-0" />
+              <span>
+                <strong>Порада: </strong>
+                <Marked text={content.tip} />
+              </span>
+            </p>
+          )}
+          {Object.keys(content.whyWrong).some((l) => l !== chosen) && (
+            <details className="text-ink-soft">
+              <summary className="cursor-pointer">Чому не підходять інші варіанти</summary>
+              <ul className="mt-2 space-y-1">
+                {Object.entries(content.whyWrong)
+                  .filter(([l]) => l !== chosen)
+                  .map(([l, why]) => (
+                    <li key={l}>
+                      <strong>{l}:</strong> <Marked text={why} />
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          )}
           <div className="flex flex-wrap items-center gap-3 text-sm text-ink-soft">
             {data.status === "needs_review" && <span>Пояснення ще перевіряється.</span>}
             <ReportButton taskId={taskId} kind="explanation" />

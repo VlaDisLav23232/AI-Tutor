@@ -41,12 +41,15 @@ export interface GoalProgress {
 
 export interface ExplanationContent {
   rule: string;
+  /** Legacy: older explanations cited a § number. New ones never do, and it is not shown. */
   ruleRef: string | null;
   whyCorrect: string;
   /** For single/order: letter → why that option is wrong. For matching: unused letters. */
   whyWrong: Record<Letter, string>;
   /** Matching only: item number → why its correct letter fits. */
   perItem?: Record<string, string>;
+  /** A short "how to remember" tip. */
+  tip?: string;
 }
 
 export type RunMode = "diagnostic" | "topic" | "practice" | "exam" | "saved";

@@ -1,6 +1,7 @@
 // Explanations verified against the answer key:
 // 1) Sonnet solves the task blind (no key) and explains; 2) if its answer matches the key the
 // explanation is "verified"; 3) otherwise it is regenerated with the key and marked "needs_review".
+// Every explanation is built like a tutor would: the rule first, then the rule applied to each option.
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { prisma } from "@/lib/db";
@@ -14,11 +15,19 @@ const Pair = z.object({ item: z.string(), letter: z.string(), why: z.string() })
 
 const ExplanationSchema = z.object({
   answer: z.string().describe("Літера правильного варіанта (для завдань на відповідність — порожній рядок)"),
-  pairs: z.array(Pair).describe("Лише для завдань на відповідність: для кожного пункту 1–4 літера та пояснення"),
-  rule: z.string().describe("Правило або норма, на якій ґрунтується завдання, 1–3 речення"),
-  ruleRef: z.string().describe("Посилання на параграф Правопису, напр. «§ 7», або порожній рядок, якщо правило не з Правопису"),
-  whyCorrect: z.string().describe("Чому правильна відповідь правильна"),
-  whyWrong: z.array(WrongOption).describe("Для кожного неправильного (або зайвого) варіанта: чому він не підходить"),
+  pairs: z
+    .array(Pair)
+    .describe("Лише для відповідностей: для кожного пункту 1–4 — літера і 1–2 речення, як правило чи значення пов'язує пункт саме з цим варіантом"),
+  rule: z
+    .string()
+    .describe("Правило, яке перевіряє завдання: 1–3 речення своїми словами, як факт, з коротким прикладом. Без згадок про джерело, параграфи чи «правопис»"),
+  whyCorrect: z
+    .string()
+    .describe("2–4 речення: застосуй правило до правильного варіанта — назви конкретні слова, що в них перевіряємо і чому все збігається з правилом"),
+  whyWrong: z
+    .array(WrongOption)
+    .describe("Для кожного неправильного (або зайвого) варіанта: 1–2 речення — яке саме слово чи місце порушує правило і як було б правильно"),
+  tip: z.string().describe("Одна коротка порада, як запам'ятати це правило або швидко перевірити себе на іспиті"),
 });
 type ExplanationOutput = z.infer<typeof ExplanationSchema>;
 
@@ -30,28 +39,42 @@ function matchesKey(out: ExplanationOutput, answer: Answer): boolean {
 function toContent(out: ExplanationOutput, answer: Answer): ExplanationContent {
   const content: ExplanationContent = {
     rule: out.rule,
-    ruleRef: out.ruleRef.trim() || null,
+    ruleRef: null,
     whyCorrect: out.whyCorrect,
     whyWrong: Object.fromEntries(out.whyWrong.map((w) => [w.letter.trim(), w.why])),
+    tip: out.tip.trim() || undefined,
   };
   if (typeof answer !== "string") content.perItem = Object.fromEntries(out.pairs.map((p) => [p.item.trim(), p.why]));
   return content;
 }
 
+function instructions(withKey: boolean): string {
+  const start = withKey
+    ? "Правильна відповідь подана в завданні. Поясни учневі, чому вона правильна."
+    : "Спершу розв'яжи завдання сам, потім поясни учневі розв'язок.";
+  return `${start}
+Побудуй пояснення як репетитор:
+1) rule — назви правило, яке перевіряє це завдання, своїми словами, як факт, з коротким прикладом (приклади бери зі слів завдання або з дуже поширених, загальновідомих слів);
+2) whyCorrect — застосуй це правило до правильного варіанта крок за кроком, з конкретними словами з завдання;
+3) whyWrong — для кожного іншого варіанта покажи, яке саме слово порушує правило і як буде правильно;
+4) tip — коротка порада, як не помилитися на іспиті.
+Перевір кожне слово кожного варіанта окремо, перш ніж писати висновок. Для неправильного варіанта обов'язково назви те конкретне слово, яке не відповідає правилу, і напиши, як воно пишеться правильно.
+Ключ завжди правильний: ніколи не пиши про помилки, неточності чи сумніви щодо ключа або умови.
+Не згадуй, звідки правило, і не посилайся на довідку.`;
+}
+
 async function callExplain(task: TaskDTO, key: Answer | undefined) {
   const rules = formatRules(retrieveRules(task.categoryLabel, `${task.question} ${Object.values(task.options).join(" ")}`));
-  const instruction = key
-    ? "Поясни це завдання. Правильна відповідь подана в завданні — поясни, чому саме вона правильна, і чому кожен інший варіант неправильний."
-    : "Розв'яжи це завдання самостійно, а потім поясни розв'язок: чому правильна відповідь правильна і чому кожен інший варіант неправильний.";
   const res = await (await claude()).messages.parse({
     model: MODEL_MAIN,
     max_tokens: 8000,
     system: systemBlocks,
-    output_config: { effort: "medium", format: zodOutputFormat(ExplanationSchema) },
+    // High effort: word-by-word checking matters more here than speed (explanations are cached).
+    output_config: { effort: "high", format: zodOutputFormat(ExplanationSchema) },
     messages: [
       {
         role: "user",
-        content: `${instruction}\n\nФрагменти Українського правопису 2019:\n${rules}\n\n${renderTask(task, key)}`,
+        content: `${instructions(key !== undefined)}\n\nДовідка для тебе (не цитуй і не згадуй):\n${rules}\n\n${renderTask(task, key)}`,
       },
     ],
   });

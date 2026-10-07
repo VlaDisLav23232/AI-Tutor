@@ -36,7 +36,7 @@ export async function streamTaskChat(opts: {
     opts.revealKey
       ? `Учень уже відповів${opts.studentResponse !== undefined ? ` (його відповідь: ${formatAnswer(opts.studentResponse as never)})` : ""}. Можна пояснювати розв'язок повністю.`
       : `Учень ще НЕ відповів. Не називай правильну відповідь і не вказуй на правильний варіант — лише наводь на думку.`,
-    `Фрагменти Правопису:\n${rules}`,
+    `Довідка для тебе (не цитуй і не згадуй джерело):\n${rules}`,
     content ? `Перевірене пояснення (спирайся на нього):\n${content.rule}\n${content.whyCorrect}` : "",
     renderTask(task, answer),
   ]

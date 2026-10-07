@@ -64,6 +64,7 @@ export function retrieveRules(categoryLabel: string, taskText: string, k = 3): R
 }
 
 export function formatRules(chunks: RuleChunk[]): string {
-  if (!chunks.length) return "Релевантних параграфів Правопису не знайдено.";
-  return chunks.map((c) => `### § ${c.section}. ${c.title}\n${c.text.slice(0, 1800)}`).join("\n\n");
+  // No § numbers: the model must state rules as facts, not cite where they come from.
+  if (!chunks.length) return "(довідки до цього завдання немає — спирайся на норми літературної мови)";
+  return chunks.map((c) => `Тема: ${c.title}\n${c.text.slice(0, 1800)}`).join("\n\n");
 }
