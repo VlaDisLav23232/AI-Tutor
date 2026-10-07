@@ -50,15 +50,12 @@ export default async function Dashboard() {
 
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-bold">Твої слабкі теми</h2>
-            <p className="text-sm text-ink-soft">Підтягни їх — і загальний бал зросте найшвидше.</p>
-          </div>
-          <Link href="/practice?focus=weak" className="flex items-center gap-2 rounded-xl border-2 border-ink px-4 py-2 font-display text-sm font-bold hover:bg-paper-2">
-            <Icon name="target" className="size-4" /> Тренувати слабкі теми
+          <h2 className="font-display text-lg font-bold">Твої 5 найслабших тем</h2>
+          <Link href="/practice?focus=weakest" className="flex items-center gap-2 rounded-xl border-2 border-ink px-4 py-2 font-display text-sm font-bold hover:bg-paper-2">
+            <Icon name="target" className="size-4" /> Тренувати найслабші теми
           </Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           {d.weakest.map((t) => (
             <TopicTile key={t.label} topic={t} />
           ))}

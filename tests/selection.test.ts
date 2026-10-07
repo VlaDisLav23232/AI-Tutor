@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { diagnosticCategories, sampleExamLayout, weaknessWeight, weightedChoice, type CategoryInfo } from "@/lib/selection";
+import { diagnosticCategories, practiceBranch, sampleExamLayout, weaknessWeight, weightedChoice, type CategoryInfo } from "@/lib/selection";
+import { weakestLabels } from "@/lib/scoring";
 import { generateForeignDraft, generateStressDraft } from "@/lib/ai/generate";
 
 function seeded(seed: number) {
@@ -86,5 +87,45 @@ describe("knowledge-base generators", () => {
     expect(Object.keys(d.options)).toHaveLength(4);
     expect(new Set(Object.values(d.options)).size).toBe(4);
     expect(d.explanation?.whyCorrect).toContain(d.options[d.answer as string]);
+  });
+});
+
+describe("weakest-topics pool", () => {
+  const labels = ["a", "b", "c", "d", "e", "f", "g"];
+  const m = { a: 0.3, b: 0.4, c: 0.5, d: 0.6, e: 0.7, f: 0.8, g: 0.9 };
+
+  it("holds the 5 lowest-mastery topics", () => {
+    expect(weakestLabels(labels, m)).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("lets the 6th-weakest in when one of the 5 improves past it", () => {
+    expect(weakestLabels(labels, { ...m, a: 0.85 })).toEqual(["b", "c", "d", "e", "f"]);
+  });
+
+  it("fills with untried topics only when fewer than 5 are tried", () => {
+    expect(weakestLabels(labels, { a: 0.9, b: 0.2 })).toEqual(["b", "a", "c", "d", "e"]);
+  });
+
+  it("breaks ties by label so dashboard and practice agree", () => {
+    expect(weakestLabels(["z", "y", "x"], { z: 0.5, y: 0.5, x: 0.5 }, 2)).toEqual(["x", "y"]);
+  });
+});
+
+describe("practice mix", () => {
+  const share = (focus: "all" | "weakest") => {
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 1000; i++) {
+      const b = practiceBranch(i / 1000, focus);
+      counts[b] = (counts[b] ?? 0) + 1;
+    }
+    return counts;
+  };
+
+  it("mixes all topics: 15% mistakes, 20% review, 35% weak, 30% any topic", () => {
+    expect(share("all")).toEqual({ mistakes: 150, review: 200, weak: 350, random: 300 });
+  });
+
+  it("never picks a random topic in the weakest mode", () => {
+    expect(share("weakest")).toEqual({ mistakes: 200, review: 200, weak: 600 });
   });
 });

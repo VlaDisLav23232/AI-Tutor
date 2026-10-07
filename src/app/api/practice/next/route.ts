@@ -5,7 +5,7 @@ import { jsonError, withUser } from "@/lib/api";
 import { pickPracticeTask } from "@/lib/selection";
 import { toDTOsFor } from "@/lib/tasks";
 
-const Body = z.object({ runId: z.string(), focus: z.enum(["all", "weak"]).optional() });
+const Body = z.object({ runId: z.string(), focus: z.enum(["all", "weakest"]).optional() });
 
 export const POST = withUser(async (userId, req: Request) => {
   const parsed = Body.safeParse(await req.json());

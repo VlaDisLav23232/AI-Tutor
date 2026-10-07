@@ -6,7 +6,7 @@ import { PracticePlayer } from "@/components/PracticePlayer";
 
 export default async function Practice({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
   const userId = await requireUserId();
-  const focus = (await searchParams).focus === "weak" ? "weak" : "all";
+  const focus = (await searchParams).focus === "weakest" ? "weakest" : "all";
   const [run, categories, streak] = await Promise.all([
     getOrCreatePracticeRun(userId),
     prisma.category.findMany({ select: { label: true, nameUa: true } }),

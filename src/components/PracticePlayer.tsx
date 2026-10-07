@@ -10,8 +10,9 @@ import { ScoreGauge } from "./ScoreGauge";
 import { shortName } from "@/lib/topicName";
 import { TaskCard, type CheckResult } from "./task/TaskCard";
 
-type Reason = "repeat" | "mistake" | "review" | "weak";
-const REASONS: Record<Reason, { label: string; icon: IconName }> = {
+/** null = an ordinary task: shown without a label. */
+type Reason = "repeat" | "mistake" | "review" | "weak" | null;
+const REASONS: Record<Exclude<Reason, null>, { label: string; icon: IconName }> = {
   weak: { label: "Слабка тема", icon: "target" },
   review: { label: "Час повторити", icon: "repeat" },
   mistake: { label: "Твоя помилка", icon: "x" },
@@ -27,7 +28,7 @@ interface TopicSession {
 
 interface Props {
   runId: string;
-  focus: "all" | "weak";
+  focus: "all" | "weakest";
   categoryNames: Record<string, string>;
   todayCount: number;
   dailyGoal: number;
@@ -37,7 +38,7 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
   const router = useRouter();
   const [runId, setRunId] = useState(initialRunId);
   const [task, setTask] = useState<TaskDTO | null>(null);
-  const [reason, setReason] = useState<Reason>("weak");
+  const [reason, setReason] = useState<Reason>(null);
   const [answered, setAnswered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,7 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
     setLoading(false);
     if (!ok || !body.task) return setError(body.error ?? "Не вдалося завантажити завдання");
     setTask(body.task);
-    setReason(body.reason ?? "weak");
+    setReason(body.reason ?? null);
     if (body.runId) setRunId(body.runId);
     setAnswered(false);
     window.scrollTo({ top: 0 });
@@ -112,16 +113,16 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
             <Icon name="x" />
           </button>
           <div className="flex rounded-xl bg-paper-2 p-1 text-sm" role="tablist" aria-label="Які теми">
-            {(["all", "weak"] as const).map((f) => (
+            {(["all", "weakest"] as const).map((f) => (
               <Link
                 key={f}
-                href={f === "all" ? "/practice" : "/practice?focus=weak"}
+                href={f === "all" ? "/practice" : "/practice?focus=weakest"}
                 replace
                 role="tab"
                 aria-selected={focus === f}
                 className={`rounded-lg px-3 py-1 ${focus === f ? "bg-card font-semibold shadow-[0_0_0_1px_var(--grid)]" : "text-ink-soft"}`}
               >
-                {f === "all" ? "Усі теми" : "Слабкі теми"}
+                {f === "all" ? "Усі теми" : "Найслабші теми"}
               </Link>
             ))}
           </div>
@@ -157,10 +158,12 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
           instant
           tag={
             <>
-              <span className="flex items-center gap-1 rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-on-ink">
-                <Icon name={REASONS[reason].icon} className="size-3.5" />
-                {REASONS[reason].label}
-              </span>
+              {reason && (
+                <span className="flex items-center gap-1 rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-on-ink">
+                  <Icon name={REASONS[reason].icon} className="size-3.5" />
+                  {REASONS[reason].label}
+                </span>
+              )}
               <span>{shortName(categoryNames[task.categoryLabel] ?? task.categoryLabel)}</span>
             </>
           }

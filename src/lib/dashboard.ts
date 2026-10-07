@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { level, overallScore, topicScore, type Level } from "./scoring";
+import { level, overallScore, topicScore, weakestLabels, WEAKEST_POOL_SIZE, type Level } from "./scoring";
 import { currentStreak, DAILY_GOAL, kyivDate, shiftDay } from "./progress";
 
 export interface TopicRow {
@@ -7,6 +7,7 @@ export interface TopicRow {
   nameUa: string;
   group: string;
   score: number | null; // 100–200, null = not tried yet
+  mastery: number | null;
   level: Level | null;
   attempts: number;
   dueForReview: boolean;
@@ -27,6 +28,7 @@ export async function getTopics(userId: string): Promise<TopicRow[]> {
       nameUa: c.nameUa,
       group: c.group,
       score,
+      mastery: m?.value ?? null,
       level: score === null ? null : level(score),
       attempts: m?.attempts ?? 0,
       dueForReview: !!m && m.nextReviewAt.getTime() <= now,
@@ -34,10 +36,14 @@ export async function getTopics(userId: string): Promise<TopicRow[]> {
   });
 }
 
-/** Weakest topics: lowest scores among tried ones, topped up with untried topics. */
-export function weakestTopics(topics: TopicRow[], n = 3): TopicRow[] {
-  const tried = topics.filter((t) => t.score !== null).sort((a, b) => a.score! - b.score!);
-  return [...tried, ...topics.filter((t) => t.score === null)].slice(0, n);
+/** The same weakest-topics pool that «Найслабші теми» practice uses. */
+export function weakestTopics(topics: TopicRow[], n = WEAKEST_POOL_SIZE): TopicRow[] {
+  const labels = weakestLabels(
+    topics.map((t) => t.label),
+    Object.fromEntries(topics.filter((t) => t.mastery !== null).map((t) => [t.label, t.mastery!])),
+    n,
+  );
+  return labels.map((l) => topics.find((t) => t.label === l)!);
 }
 
 export interface StreakInfo {

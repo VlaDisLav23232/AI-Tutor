@@ -53,6 +53,21 @@ export function overallScore(masteries: number[]): number | null {
   return topicScore(masteries.reduce((a, b) => a + b, 0) / masteries.length);
 }
 
+export const WEAKEST_POOL_SIZE = 5;
+
+/**
+ * The student's N weakest topics: lowest mastery first; untried topics only fill the list when fewer than N
+ * topics have been tried. Recomputed before every task, so a topic that improves out of the bottom N is
+ * replaced by the next weakest one.
+ */
+export function weakestLabels(labels: string[], masteryByLabel: Record<string, number | undefined>, n = WEAKEST_POOL_SIZE): string[] {
+  // Ties break by label so the dashboard and practice always agree on the same pool.
+  const byLabel = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const tried = labels.filter((l) => masteryByLabel[l] !== undefined).sort((a, b) => masteryByLabel[a]! - masteryByLabel[b]! || byLabel(a, b));
+  const untried = labels.filter((l) => masteryByLabel[l] === undefined).sort(byLabel);
+  return [...tried, ...untried].slice(0, n);
+}
+
 export type Level = "weak" | "ok" | "strong";
 export const LEVEL_BOUNDS = { ok: 140, strong: 170 } as const;
 export const LEVEL_LABEL: Record<Level, string> = { weak: "Треба підтягнути", ok: "Непогано", strong: "Сильно" };

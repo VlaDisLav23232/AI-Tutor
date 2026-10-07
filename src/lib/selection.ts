@@ -1,7 +1,7 @@
 // Task pickers for each mode. Pure helpers are exported for unit tests.
 import type { Task } from "@/generated/prisma/client";
 import { prisma } from "./db";
-import { UNTESTED_MASTERY } from "./scoring";
+import { UNTESTED_MASTERY, weakestLabels } from "./scoring";
 import { generateForCategory, KB_CATEGORIES } from "./ai/generate";
 
 export type Rng = () => number;
@@ -134,26 +134,35 @@ export async function pickExam(): Promise<string[]> {
 
 const RECENT_WINDOW = 20;
 const MISTAKE_DAYS = 7;
-export const WEAK_FOCUS_SIZE = 3;
 
-/** Why a practice task was chosen; shown to the student. */
-export type PracticeReason = "repeat" | "mistake" | "review" | "weak";
+/** Why a practice task was chosen; shown to the student. null = an ordinary task, shown without a label. */
+export type PracticeReason = "repeat" | "mistake" | "review" | "weak" | null;
+export type PracticeFocus = "all" | "weakest";
 
-/** Practice weight of a topic: lower mastery → much more likely. Every topic counts equally otherwise. */
+/** Practice weight of a topic: lower mastery → much more likely. */
 export function weaknessWeight(m: number | undefined): number {
   return (1 - (m ?? UNTESTED_MASTERY)) ** 2;
 }
 
+export type PracticeBranch = "mistakes" | "review" | "weak" | "random";
+
 /**
- * Next practice task, one at a time:
- * - ~25%: tasks marked «!» first, then recent mistakes (a stored twin, or the same task after a day);
- * - ~25%: a topic that is due for review;
- * - ~50% (and whenever the above has nothing): a weak topic, weighted by weaknessWeight.
- * With focus "weak", only the student's weakest topics are used.
+ * Which source the next task comes from, for a random number r in [0, 1):
+ * - "all":     15% mistakes and «!», 20% topics due for review, 35% weak topics (weighted), 30% any topic (equal chance);
+ * - "weakest": 20% mistakes and «!», 20% review, 60% weak — all inside the 5 weakest topics.
+ */
+export function practiceBranch(r: number, focus: PracticeFocus): PracticeBranch {
+  if (focus === "weakest") return r < 0.2 ? "mistakes" : r < 0.4 ? "review" : "weak";
+  return r < 0.15 ? "mistakes" : r < 0.35 ? "review" : r < 0.7 ? "weak" : "random";
+}
+
+/**
+ * Next practice task, one at a time (see practiceBranch for the mix). A branch with nothing to offer falls back
+ * to a weighted weak-topic pick. The «Слабка тема» label is shown only for topics currently in the bottom 5.
  * Never spends AI money: when a topic is exhausted it repeats the oldest seen task
  * (stress and foreign words get fresh tasks from the free knowledge base).
  */
-export async function pickPracticeTask(userId: string, focus: "all" | "weak" = "all"): Promise<{ task: Task; reason: PracticeReason } | null> {
+export async function pickPracticeTask(userId: string, focus: PracticeFocus = "all"): Promise<{ task: Task; reason: PracticeReason } | null> {
   const [categories, masteryRows, recent] = await Promise.all([
     loadCategories(),
     prisma.mastery.findMany({ where: { userId } }),
@@ -161,15 +170,15 @@ export async function pickPracticeTask(userId: string, focus: "all" | "weak" = "
   ]);
   const recentIds = new Set(recent.slice(0, RECENT_WINDOW).map((a) => a.taskId));
   const mastery = Object.fromEntries(masteryRows.map((m) => [m.categoryLabel, m]));
-  let usable = categories.filter((c) => c.label !== "other");
-  if (focus === "weak") {
-    const weakest = [...usable].sort((a, b) => (mastery[a.label]?.value ?? 2) - (mastery[b.label]?.value ?? 2)).slice(0, WEAK_FOCUS_SIZE);
-    usable = weakest;
-  }
+  const all = categories.filter((c) => c.label !== "other");
+  const weakest = new Set(weakestLabels(all.map((c) => c.label), Object.fromEntries(masteryRows.map((m) => [m.categoryLabel, m.value]))));
+  const usable = focus === "weakest" ? all.filter((c) => weakest.has(c.label)) : all;
   const usableSet = new Set(usable.map((c) => c.label));
-  const r = Math.random();
+  const lastLabel = recent[0]?.task.categoryLabel;
+  const notLast = (c: CategoryInfo) => !(c.label === lastLabel && usable.length > 1);
+  const branch = practiceBranch(Math.random(), focus);
 
-  if (r < 0.25) {
+  if (branch === "mistakes") {
     const repeat = await prisma.savedTask.findMany({ where: { userId, kind: "repeat" }, include: { task: true }, orderBy: { createdAt: "asc" } });
     const marked = repeat.find((s) => !recentIds.has(s.taskId) && usableSet.has(s.task.categoryLabel));
     if (marked) return { task: marked.task, reason: "repeat" };
@@ -183,18 +192,22 @@ export async function pickPracticeTask(userId: string, focus: "all" | "weak" = "
   }
 
   let label: string | null = null;
-  let reason: PracticeReason = "weak";
-  if (r >= 0.25 && r < 0.5) {
+  let fromReview = false;
+  if (branch === "review") {
     const due = usable.filter((c) => mastery[c.label] && mastery[c.label].nextReviewAt.getTime() <= Date.now());
     label = due.length ? due[Math.floor(Math.random() * due.length)].label : null;
-    if (label) reason = "review";
+    fromReview = !!label;
+  }
+  if (!label && branch === "random") {
+    const pool = usable.filter(notLast);
+    label = pool.length ? pool[Math.floor(Math.random() * pool.length)].label : null;
   }
   if (!label) {
     // Damp the topic just practiced so the same one doesn't come up back to back.
-    const lastLabel = recent[0]?.task.categoryLabel;
-    label = weightedChoice(usable, (c) => weaknessWeight(mastery[c.label]?.value) * (c.label === lastLabel && usable.length > 1 ? 0.2 : 1))?.label ?? null;
+    label = weightedChoice(usable, (c) => weaknessWeight(mastery[c.label]?.value) * (notLast(c) ? 1 : 0.2))?.label ?? null;
   }
   if (!label) return null;
+  const reason: PracticeReason = fromReview ? "review" : weakest.has(label) ? "weak" : null;
 
   const seen = await seenTaskIds(userId);
   const tasks = (await prisma.task.findMany({ where: { categoryLabel: label, verified: true } })).filter((t) => !recentIds.has(t.id));

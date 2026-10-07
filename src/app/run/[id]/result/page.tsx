@@ -91,7 +91,7 @@ export default async function RunResult({ params }: { params: Promise<{ id: stri
         <section>
           <h2 className="font-display text-lg font-bold">Почни з цих тем</h2>
           <p className="text-sm text-ink-soft">Вони зараз найслабші — тут найшвидше зростає бал.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             {dashboard.weakest.map((t) => (
               <TopicTile key={t.label} topic={t} />
             ))}
