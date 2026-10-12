@@ -43,9 +43,10 @@ npm run dev                         # http://localhost:3000
 ```
 
 - **Without Google credentials:** set `AUTH_DEV_LOGIN=true` to get a demo login button.
-- **Without `ANTHROPIC_API_KEY`:** everything works except AI explanations, chat and LLM generation.
+- **AI provider:** `AI_PROVIDER=anthropic` (default, needs `ANTHROPIC_API_KEY`) or `AI_PROVIDER=gemini` (needs `GEMINI_API_KEY`). Model ids can be overridden, see `.env.example`.
+- **Without the provider's API key:** everything works except AI explanations, chat and LLM generation.
 
-**AI costs.** Every Claude call is logged with its cost in the server console and recorded in the `AiUsage` table. When the total reaches `AI_BUDGET_USD` (default $1.50), AI features switch off with a message. Rough prices:
+**AI costs.** Every AI call is logged with its cost in the server console and recorded in the `AiUsage` table. When the total reaches `AI_BUDGET_USD` (default $1.50), AI features switch off with a message. Rough prices with Claude (Gemini Flash is several times cheaper):
 
 | Call | Cost |
 | --- | --- |

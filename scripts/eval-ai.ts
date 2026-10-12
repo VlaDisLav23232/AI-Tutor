@@ -6,7 +6,7 @@
 // Run: npx tsx scripts/eval-ai.ts [--generate N]
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
-import { aiEnabled } from "../src/lib/ai/client";
+import { AI_PROVIDER, aiEnabled } from "../src/lib/ai/client";
 import { generateForCategory } from "../src/lib/ai/generate";
 import type { ExplanationContent } from "../src/lib/types";
 
@@ -37,8 +37,8 @@ async function explanationReport() {
 }
 
 async function generationReport(n: number) {
-  if (!aiEnabled()) return console.log("\nSkipping generation check: ANTHROPIC_API_KEY not set.");
-  console.log(`\nGeneration (${n} per category): saved = passed the blind Haiku check`);
+  if (!aiEnabled()) return console.log(`\nSkipping generation check: no API key for ${AI_PROVIDER}.`);
+  console.log(`\nGeneration (${n} per category): saved = passed the blind check by the fast model`);
   for (const label of ["phraseology_matching", "lexical_error", "doubled_letters", "punctuation_error"]) {
     const parents = await prisma.task.findMany({ where: { categoryLabel: label, source: "nmt2026" }, take: n });
     let ok = 0;

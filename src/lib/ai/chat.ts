@@ -1,17 +1,13 @@
-// "Поясни інакше" and free-form questions about one task, streamed from Sonnet.
-import type Anthropic from "@anthropic-ai/sdk";
+// "Поясни інакше" and free-form questions about one task, streamed from the main model.
 import { prisma } from "@/lib/db";
 import { getTaskWithKey } from "@/lib/tasks";
 import { formatRules, retrieveRules } from "@/lib/rag";
 import type { ExplanationContent } from "@/lib/types";
-import { AiUnavailableError, aiEnabled, claude, formatAnswer, MODEL_MAIN, renderTask, systemBlocks, trackUsage } from "./client";
+import { AiUnavailableError, aiEnabled, formatAnswer, renderTask, streamText, type ChatTurn } from "./client";
+
+export type { ChatTurn };
 
 export const MAX_TURNS = 10;
-
-export interface ChatTurn {
-  role: "user" | "assistant";
-  content: string;
-}
 
 /**
  * Streams the tutor's reply as plain text. `revealKey` is false until the student has answered:
@@ -44,30 +40,18 @@ export async function streamTaskChat(opts: {
     .join("\n\n");
 
   const turns = opts.turns.slice(-MAX_TURNS);
-  const messages: Anthropic.MessageParam[] = turns.map((t, i) =>
-    i === 0 && t.role === "user" ? { role: "user", content: `${context}\n\nПитання учня: ${t.content}` } : { role: t.role, content: t.content },
+  const messages: ChatTurn[] = turns.map((t, i) =>
+    i === 0 && t.role === "user" ? { role: "user", content: `${context}\n\nПитання учня: ${t.content}` } : t,
   );
 
-  const stream = (await claude()).messages.stream({
-    model: MODEL_MAIN,
-    max_tokens: 2000,
-    system: systemBlocks,
-    output_config: { effort: "low" },
-    messages,
-  });
+  const abort = new AbortController();
+  const chunks = await streamText({ label: "chat", tier: "main", maxTokens: 2000, effort: "low", messages }, abort.signal);
 
   const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            controller.enqueue(encoder.encode(event.delta.text));
-          }
-        }
-        const final = await stream.finalMessage();
-        await trackUsage("chat", MODEL_MAIN, final.usage);
-        if (final.stop_reason === "refusal") controller.enqueue(encoder.encode("\n\n(AI не зміг відповісти на це питання.)"));
+        for await (const text of chunks) controller.enqueue(encoder.encode(text));
       } catch (e) {
         console.error(e);
         controller.enqueue(encoder.encode("\n\n(Сталася помилка AI. Спробуй ще раз.)"));
@@ -76,7 +60,7 @@ export async function streamTaskChat(opts: {
       }
     },
     cancel() {
-      stream.abort();
+      abort.abort();
     },
   });
 }

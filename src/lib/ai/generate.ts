@@ -1,8 +1,7 @@
 // "One more task like this": reuse a stored twin, generate deterministically from the knowledge
-// base (stress, foreign words), or generate with Sonnet and keep only what Haiku can verify.
+// base (stress, foreign words), or generate with the main model and keep only what the fast model can verify.
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { prisma } from "@/lib/db";
 import { toDTO } from "@/lib/tasks";
 import { formatRules, retrieveRules } from "@/lib/rag";
@@ -10,7 +9,7 @@ import { LETTERS, type Answer, type ExplanationContent, type TaskDTO } from "@/l
 import stressKb from "@/data/kb-stress.json";
 import idiomKb from "@/data/kb-idioms.json";
 import foreignKb from "@/data/kb-foreign.json";
-import { aiEnabled, claude, MODEL_MAIN, renderTask, systemBlocks, trackUsage } from "./client";
+import { aiEnabled, generateJson, renderTask } from "./client";
 import { blindSolveMatches } from "./verify";
 import type { Task } from "@/generated/prisma/client";
 
@@ -134,7 +133,7 @@ export function generateForeignDraft(): Draft {
   };
 }
 
-// ---------- LLM generators (verified by a blind Haiku solve) ----------
+// ---------- LLM generators (verified by a blind solve with the fast model) ----------
 
 const SentencesSchema = z.object({
   sentences: z.array(z.object({ idiom: z.string(), sentence: z.string() })).describe("4 речення з пропуском […] на місці фразеологізму"),
@@ -143,22 +142,16 @@ const SentencesSchema = z.object({
 async function generatePhraseologyDraft(): Promise<Draft | null> {
   const idioms = pick(idiomKb as { idiom: string; meaning: string }[], 5);
   const used = idioms.slice(0, 4);
-  const res = await (await claude()).messages.parse({
-    model: MODEL_MAIN,
-    max_tokens: 3000,
-    system: systemBlocks,
-    output_config: { effort: "low", format: zodOutputFormat(SentencesSchema) },
-    messages: [
-      {
-        role: "user",
-        content: `Склади по одному реченню для кожного фразеологізму, як у завданнях НМТ. Фразеологізм заміни на «[…]». Речення має однозначно підказувати саме цей фразеологізм за його значенням і не підходити до інших.\n\n${used
+  const out = await generateJson({
+    label: "generate(phraseology)",
+    tier: "main",
+    maxTokens: 3000,
+    effort: "low",
+    schema: SentencesSchema,
+    prompt: `Склади по одному реченню для кожного фразеологізму, як у завданнях НМТ. Фразеологізм заміни на «[…]». Речення має однозначно підказувати саме цей фразеологізм за його значенням і не підходити до інших.\n\n${used
           .map((i) => `- ${i.idiom} — ${i.meaning}`)
           .join("\n")}\n\nЩе один фразеологізм буде зайвим варіантом: ${idioms[4].idiom} — ${idioms[4].meaning}`,
-      },
-    ],
   });
-  await trackUsage("generate(phraseology)", MODEL_MAIN, res.usage);
-  const out = res.parsed_output;
   if (!out || out.sentences.length < 4) return null;
   const optionOrder = shuffle(idioms);
   const options = Object.fromEntries(optionOrder.map((i, k) => [LETTERS[k], i.idiom]));
@@ -203,20 +196,14 @@ async function generateSingleDraft(parent: Task): Promise<Draft | null> {
   });
   const show = (t: Task) => renderTask(toDTO(t), t.answer as Answer);
   const rules = formatRules(retrieveRules(parent.categoryLabel, parent.question, 2));
-  const res = await (await claude()).messages.parse({
-    model: MODEL_MAIN,
-    max_tokens: 4000,
-    system: systemBlocks,
-    output_config: { effort: "medium", format: zodOutputFormat(SingleSchema) },
-    messages: [
-      {
-        role: "user",
-        content: `Склади НОВЕ завдання НМТ того самого типу, що й приклади, щоб учень потренував ту саму навичку, на якій помилився в першому прикладі. Використай інші слова чи речення. Має бути рівно одна однозначно правильна відповідь за чинними нормами української мови. Виділення пиши в дужках ⟦…⟧, як у прикладах.\n\nДовідка для тебе:\n${rules}\n\nПриклад, у якому учень помилився:\n${show(parent)}\n\n${examples.map((e, i) => `Ще приклад ${i + 1}:\n${show(e)}`).join("\n\n")}`,
-      },
-    ],
+  const out = await generateJson({
+    label: "generate(single)",
+    tier: "main",
+    maxTokens: 4000,
+    effort: "medium",
+    schema: SingleSchema,
+    prompt: `Склади НОВЕ завдання НМТ того самого типу, що й приклади, щоб учень потренував ту саму навичку, на якій помилився в першому прикладі. Використай інші слова чи речення. Має бути рівно одна однозначно правильна відповідь за чинними нормами української мови. Виділення пиши в дужках ⟦…⟧, як у прикладах.\n\nДовідка для тебе:\n${rules}\n\nПриклад, у якому учень помилився:\n${show(parent)}\n\n${examples.map((e, i) => `Ще приклад ${i + 1}:\n${show(e)}`).join("\n\n")}`,
   });
-  await trackUsage("generate(single)", MODEL_MAIN, res.usage);
-  const out = res.parsed_output;
   if (!out) return null;
   const options = Object.fromEntries(out.options.map((o) => [o.letter.trim(), o.text.trim()]));
   if (Object.keys(options).length < 4 || !(out.answer.trim() in options)) return null;
@@ -244,7 +231,7 @@ async function verified(draft: Draft | null): Promise<Draft | null> {
 /** Topics generated from the knowledge base without any AI call (free). */
 export const KB_CATEGORIES = new Set(["stress", "foreign_word_equivalent"]);
 
-/** Fresh generated task for a category. Non-KB categories call Claude — only on explicit user request. */
+/** Fresh generated task for a category. Non-KB categories call the AI — only on explicit user request. */
 export async function generateForCategory(categoryLabel: string, parent: Task | null): Promise<Task | null> {
   if (categoryLabel === "stress") return saveDraft(generateStressDraft(), parent?.id ?? null);
   if (categoryLabel === "foreign_word_equivalent") return saveDraft(generateForeignDraft(), parent?.id ?? null);

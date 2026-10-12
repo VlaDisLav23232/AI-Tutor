@@ -1,16 +1,16 @@
 // Precomputes verified AI explanations for all real tasks (cached in the Explanation table).
-// Each task: Sonnet solves blind → matches key = "verified", else re-explained with key = "needs_review".
-// Costs about $0.02–0.03 per task (one or two Sonnet calls), and stops at the AI_BUDGET_USD cap.
+// Each task: the main model solves blind → matches key = "verified", else re-explained with key = "needs_review".
+// Costs about $0.02–0.03 per task (one or two calls with Claude Sonnet; Gemini Flash is cheaper), and stops at the AI_BUDGET_USD cap.
 // Run: npx tsx scripts/gen-explanations.ts --limit N [--force]
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { generateExplanation } from "../src/lib/ai/explain";
-import { aiEnabled, aiSpentUsd, AI_BUDGET_USD } from "../src/lib/ai/client";
+import { AI_PROVIDER, aiEnabled, aiSpentUsd, AI_BUDGET_USD } from "../src/lib/ai/client";
 
 const CONCURRENCY = 5;
 
 async function main() {
-  if (!aiEnabled()) throw new Error("Set ANTHROPIC_API_KEY in .env first");
+  if (!aiEnabled()) throw new Error(`Set the API key for AI_PROVIDER=${AI_PROVIDER} in .env first`);
   const args = process.argv.slice(2);
   const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : undefined;
   const force = args.includes("--force");

@@ -1,14 +1,13 @@
 // Explanations verified against the answer key:
-// 1) Sonnet solves the task blind (no key) and explains; 2) if its answer matches the key the
+// 1) The main model solves the task blind (no key) and explains; 2) if its answer matches the key the
 // explanation is "verified"; 3) otherwise it is regenerated with the key and marked "needs_review".
 // Every explanation is built like a tutor would: the rule first, then the rule applied to each option.
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { prisma } from "@/lib/db";
 import { getTaskWithKey } from "@/lib/tasks";
 import { formatRules, retrieveRules } from "@/lib/rag";
 import type { Answer, ExplanationContent, TaskDTO } from "@/lib/types";
-import { AiUnavailableError, aiEnabled, claude, MODEL_MAIN, renderTask, systemBlocks, trackUsage } from "./client";
+import { AiUnavailableError, aiEnabled, generateJson, modelId, renderTask } from "./client";
 
 const WrongOption = z.object({ letter: z.string(), why: z.string() });
 const Pair = z.object({ item: z.string(), letter: z.string(), why: z.string() });
@@ -65,22 +64,18 @@ function instructions(withKey: boolean): string {
 
 async function callExplain(task: TaskDTO, key: Answer | undefined) {
   const rules = formatRules(retrieveRules(task.categoryLabel, `${task.question} ${Object.values(task.options).join(" ")}`));
-  const res = await (await claude()).messages.parse({
-    model: MODEL_MAIN,
-    max_tokens: 8000,
-    system: systemBlocks,
+  const label = key ? "explain(with key)" : "explain(blind)";
+  const out = await generateJson({
+    label,
+    tier: "main",
+    maxTokens: 8000,
     // High effort: word-by-word checking matters more here than speed (explanations are cached).
-    output_config: { effort: "high", format: zodOutputFormat(ExplanationSchema) },
-    messages: [
-      {
-        role: "user",
-        content: `${instructions(key !== undefined)}\n\nДовідка для тебе (не цитуй і не згадуй):\n${rules}\n\n${renderTask(task, key)}`,
-      },
-    ],
+    effort: "high",
+    schema: ExplanationSchema,
+    prompt: `${instructions(key !== undefined)}\n\nДовідка для тебе (не цитуй і не згадуй):\n${rules}\n\n${renderTask(task, key)}`,
   });
-  await trackUsage(key ? "explain(with key)" : "explain(blind)", MODEL_MAIN, res.usage);
-  if (res.stop_reason === "refusal" || !res.parsed_output) throw new Error(`explain failed: ${res.stop_reason}`);
-  return res.parsed_output;
+  if (!out) throw new Error(`${label} failed: refused or unusable output`);
+  return out;
 }
 
 export async function generateExplanation(taskId: string) {
@@ -97,9 +92,10 @@ export async function generateExplanation(taskId: string) {
     status = "needs_review";
   }
   const content = toContent(out, answer);
+  const model = modelId("main");
   return prisma.explanation.upsert({
     where: { taskId },
-    create: { taskId, content: content as object, status, model: MODEL_MAIN },
-    update: { content: content as object, status, model: MODEL_MAIN },
+    create: { taskId, content: content as object, status, model },
+    update: { content: content as object, status, model },
   });
 }
