@@ -69,8 +69,8 @@ async function callExplain(task: TaskDTO, key: Answer | undefined) {
     label,
     tier: "main",
     maxTokens: 8000,
-    // High effort: word-by-word checking matters more here than speed (explanations are cached).
-    effort: "high",
+    // Medium effort: high made Gemini take over a minute per explanation for the same answer.
+    effort: "medium",
     schema: ExplanationSchema,
     prompt: `${instructions(key !== undefined)}\n\nДовідка для тебе (не цитуй і не згадуй):\n${rules}\n\n${renderTask(task, key)}`,
   });
