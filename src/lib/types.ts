@@ -52,6 +52,14 @@ export interface ExplanationContent {
   tip?: string;
 }
 
+/** One line of the explanation agent's progress, shown while it works. Never mentions § numbers. */
+export interface AgentStep {
+  kind: "start" | "search" | "check" | "submit" | "fallback" | "done";
+  /** true = a check passed, false = it failed, absent = neutral. */
+  ok?: boolean;
+  text: string;
+}
+
 export type RunMode = "diagnostic" | "topic" | "practice" | "exam" | "saved";
 
 export const LETTERS = ["А", "Б", "В", "Г", "Д"] as const;

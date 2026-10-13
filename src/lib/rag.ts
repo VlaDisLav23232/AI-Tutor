@@ -63,6 +63,12 @@ export function retrieveRules(categoryLabel: string, taskText: string, k = 3): R
   return (getIndex().search(query, { combineWith: "OR" }) as unknown as RuleChunk[]).slice(0, k);
 }
 
+/** Free-text search the explanation agent runs with its own query; skips chunks it has already seen. */
+export function searchRules(query: string, exclude: Set<string>, k = 2): RuleChunk[] {
+  const hits = getIndex().search(query.replace(/[⟦⟧[\]…]/g, " "), { combineWith: "OR" }) as unknown as RuleChunk[];
+  return hits.filter((c) => !exclude.has(c.id)).slice(0, k);
+}
+
 export function formatRules(chunks: RuleChunk[]): string {
   // No § numbers: the model must state rules as facts, not cite where they come from.
   if (!chunks.length) return "(довідки до цього завдання немає — спирайся на норми літературної мови)";

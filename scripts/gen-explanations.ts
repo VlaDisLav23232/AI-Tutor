@@ -1,5 +1,5 @@
 // Precomputes verified AI explanations for all real tasks (cached in the Explanation table).
-// Each task: the main model solves blind → matches key = "verified", else re-explained with key = "needs_review".
+// Each task runs the explanation agent (src/lib/ai/explain.ts): accepted blind solution = "verified", else "needs_review".
 // Costs about $0.02–0.03 per task (one or two calls with Claude Sonnet; Gemini Flash is cheaper), and stops at the AI_BUDGET_USD cap.
 // Run: npx tsx scripts/gen-explanations.ts --limit N [--force]
 import "dotenv/config";
