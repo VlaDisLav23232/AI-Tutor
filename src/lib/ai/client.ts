@@ -1,28 +1,25 @@
 import type { Answer, TaskDTO } from "@/lib/types";
 import { anthropic } from "./providers/anthropic";
 import { gemini } from "./providers/gemini";
-import type { JsonRequest, Provider, StreamRequest, Tier } from "./providers/types";
+import { groq } from "./providers/groq";
+import type { JsonRequest, JsonResult, Provider, StreamRequest } from "./providers/types";
 import { AiUnavailableError, assertBudget } from "./usage";
 
 export { AI_BUDGET_USD, AiUnavailableError, aiSpentUsd } from "./usage";
 export type { ChatTurn, Effort, Tier } from "./providers/types";
 
-// Chosen with AI_PROVIDER in .env ("anthropic" by default). Each provider has a "main" model for
+// Chosen with AI_PROVIDER in .env: anthropic (default), gemini or groq. Each provider has a "main" model for
 // explanations, chat and generation and a "fast" one for blind verification of generated tasks.
-const PROVIDERS: Record<string, Provider> = { anthropic, gemini };
+// Only the chosen provider is ever called: if it fails, the request fails.
+const PROVIDERS: Record<string, Provider> = { anthropic, gemini, groq };
 const providerName = process.env.AI_PROVIDER?.trim().toLowerCase() || "anthropic";
 const provider = PROVIDERS[providerName];
-if (!provider) throw new Error(`Unknown AI_PROVIDER "${providerName}": use ${Object.keys(PROVIDERS).join(" or ")}`);
+if (!provider) throw new Error(`Unknown AI_PROVIDER "${providerName}": use ${Object.keys(PROVIDERS).join(", ")}`);
 
 export const AI_PROVIDER = provider.name;
 
 export function aiEnabled(): boolean {
   return Boolean(process.env[provider.apiKeyEnv]);
-}
-
-/** Model id for a tier of the active provider (stored alongside generated content). */
-export function modelId(tier: Tier): string {
-  return provider.models[tier];
 }
 
 /** Throws an AiUnavailableError when the key is missing or the spending cap is reached. */
@@ -31,10 +28,15 @@ async function ensureAvailable() {
   await assertBudget();
 }
 
-/** Structured output with the shared tutor system prompt; null when the model refused or the output was unusable. */
-export async function generateJson<T>(req: Omit<JsonRequest<T>, "system">): Promise<T | null> {
+/** Structured output with the shared tutor system prompt, plus the model that produced it. */
+export async function generateJsonWithModel<T>(req: Omit<JsonRequest<T>, "system">): Promise<JsonResult<T>> {
   await ensureAvailable();
   return provider.generateJson({ ...req, system: SYSTEM_PROMPT });
+}
+
+/** Structured output; null when the model refused or the output was unusable. */
+export async function generateJson<T>(req: Omit<JsonRequest<T>, "system">): Promise<T | null> {
+  return (await generateJsonWithModel(req)).data;
 }
 
 /** Streamed plain-text reply with the shared tutor system prompt. */

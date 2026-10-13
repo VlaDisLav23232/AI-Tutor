@@ -45,8 +45,7 @@ export const anthropic: Provider = {
       messages: [{ role: "user", content: req.prompt }],
     });
     await track(req.label, model, res.usage);
-    if (res.stop_reason === "refusal") return null;
-    return res.parsed_output ?? null;
+    return { data: res.stop_reason === "refusal" ? null : (res.parsed_output ?? null), model };
   },
 
   async *streamText(req, signal) {

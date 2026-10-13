@@ -27,12 +27,18 @@ export interface StreamRequest extends BaseRequest {
   messages: ChatTurn[];
 }
 
+/** `data` is null when the model refused or returned nothing usable; `model` is the one that answered. */
+export interface JsonResult<T> {
+  data: T | null;
+  model: string;
+}
+
 export interface Provider {
   name: string;
   apiKeyEnv: string;
   models: Record<Tier, string>;
-  /** Structured output validated against `schema`; null when the model refused or returned nothing usable. */
-  generateJson<T>(req: JsonRequest<T>): Promise<T | null>;
+  /** Structured output validated against `schema`. */
+  generateJson<T>(req: JsonRequest<T>): Promise<JsonResult<T>>;
   /** Plain-text reply, chunk by chunk. */
   streamText(req: StreamRequest, signal: AbortSignal): AsyncIterable<string>;
 }

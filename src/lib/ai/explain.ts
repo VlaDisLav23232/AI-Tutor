@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { getTaskWithKey } from "@/lib/tasks";
 import { formatRules, retrieveRules } from "@/lib/rag";
 import type { Answer, ExplanationContent, TaskDTO } from "@/lib/types";
-import { AiUnavailableError, aiEnabled, generateJson, modelId, renderTask } from "./client";
+import { AiUnavailableError, aiEnabled, generateJsonWithModel, renderTask } from "./client";
 
 const WrongOption = z.object({ letter: z.string(), why: z.string() });
 const Pair = z.object({ item: z.string(), letter: z.string(), why: z.string() });
@@ -65,7 +65,7 @@ function instructions(withKey: boolean): string {
 async function callExplain(task: TaskDTO, key: Answer | undefined) {
   const rules = formatRules(retrieveRules(task.categoryLabel, `${task.question} ${Object.values(task.options).join(" ")}`));
   const label = key ? "explain(with key)" : "explain(blind)";
-  const out = await generateJson({
+  const { data, model } = await generateJsonWithModel({
     label,
     tier: "main",
     maxTokens: 8000,
@@ -74,8 +74,8 @@ async function callExplain(task: TaskDTO, key: Answer | undefined) {
     schema: ExplanationSchema,
     prompt: `${instructions(key !== undefined)}\n\nДовідка для тебе (не цитуй і не згадуй):\n${rules}\n\n${renderTask(task, key)}`,
   });
-  if (!out) throw new Error(`${label} failed: refused or unusable output`);
-  return out;
+  if (!data) throw new Error(`${label} failed: refused or unusable output`);
+  return { out: data, model };
 }
 
 export async function generateExplanation(taskId: string) {
@@ -84,15 +84,14 @@ export async function generateExplanation(taskId: string) {
   if (!found) throw new Error(`task ${taskId} not found`);
   const { task, answer } = found;
 
-  const blind = await callExplain(task, undefined);
+  // `model` is whichever model wrote the final text (it can differ from the configured one after a fallback).
+  let { out, model } = await callExplain(task, undefined);
   let status = "verified";
-  let out = blind;
-  if (!matchesKey(blind, answer)) {
-    out = await callExplain(task, answer);
+  if (!matchesKey(out, answer)) {
+    ({ out, model } = await callExplain(task, answer));
     status = "needs_review";
   }
   const content = toContent(out, answer);
-  const model = modelId("main");
   return prisma.explanation.upsert({
     where: { taskId },
     create: { taskId, content: content as object, status, model },
