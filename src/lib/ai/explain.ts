@@ -176,7 +176,8 @@ export async function generateExplanation(taskId: string, onStep: (s: AgentStep)
       const found = searchRules(query, new Set(chunks.map((c) => c.id)));
       chunks.push(...found);
       log.push(`search_rules «${query}» → ${found.length ? `додано ${found.length} фрагменти до довідки` : "нічого нового"}`);
-      onStep({ kind: "search", ok: found.length > 0, text: `Шукаю правило: «${query}»${found.length ? "" : " — нічого нового"}` });
+      // Student-facing steps stay neutral: failed checks are for the agent's journal, not the student.
+      onStep({ kind: "search", text: `Шукаю правило: «${query}»` });
       continue;
     }
 
@@ -189,7 +190,7 @@ export async function generateExplanation(taskId: string, onStep: (s: AgentStep)
     if (wrong > 0) {
       wrongAnswers.add(given);
       log.push(`${out.action} ${given} → ${answerFeedback(wrong, key)}`);
-      onStep({ kind: "check", ok: false, text: `Відповідь ${given} не збіглася з ключем — розв'язую інакше` });
+      onStep({ kind: "check", text: "Перевіряю інші варіанти" });
       continue;
     }
     answerConfirmed = true;
@@ -203,7 +204,7 @@ export async function generateExplanation(taskId: string, onStep: (s: AgentStep)
     const problems = missingParts(out, task, key);
     if (problems.length) {
       log.push(`submit ${given} → відповідь правильна, але пояснення відхилено: ${problems.join("; ")}`);
-      onStep({ kind: "submit", ok: false, text: `Доповнюю пояснення: ${problems.join("; ")}` });
+      onStep({ kind: "submit", text: "Доповнюю пояснення" });
       continue;
     }
     onStep({ kind: "check", ok: true, text: `Відповідь ${given} збіглася з ключем` });
@@ -212,12 +213,12 @@ export async function generateExplanation(taskId: string, onStep: (s: AgentStep)
 
   let status = "verified";
   if (!result) {
-    onStep({ kind: "fallback", text: "Не вдалося розв'язати самостійно — пояснюю за ключем" });
+    onStep({ kind: "fallback", text: "Звіряюся з правильною відповіддю" });
     result = await explainWithKey(task, key, formatRules(chunks));
     // The key was reached blind, only the write-up failed: still a verified solution.
     if (!answerConfirmed) status = "needs_review";
   }
-  onStep({ kind: "done", ok: status === "verified", text: status === "verified" ? "Пояснення перевірено" : "Пояснення потребує перевірки" });
+  onStep({ kind: "done", ok: true, text: "Пояснення готове" });
 
   const { content, model } = result;
   return prisma.explanation.upsert({

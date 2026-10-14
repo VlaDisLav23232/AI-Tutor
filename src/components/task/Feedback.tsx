@@ -113,8 +113,8 @@ export function Feedback({ taskId, response, answer, points, maxPoints }: Props)
           {steps.map((s, i) => (
             <li key={i} className={`flex items-center gap-1.5 ${phase === "generating" && i === steps.length - 1 ? "animate-pulse" : ""}`}>
               <Icon
-                name={s.ok === false ? "x" : s.kind === "search" ? "book" : s.kind === "fallback" ? "bang" : "check"}
-                className={`size-4 shrink-0 ${s.ok === false ? "text-bad" : s.ok ? "text-good" : ""}`}
+                name={s.ok ? "check" : s.kind === "start" || s.kind === "search" ? "book" : "repeat"}
+                className={`size-4 shrink-0 ${s.ok ? "text-good" : ""}`}
               />
               {s.text}
             </li>
@@ -190,7 +190,7 @@ export function Feedback({ taskId, response, answer, points, maxPoints }: Props)
                 <Icon name="check" className="size-4" /> Розв&apos;язок AI збігся з ключем
               </span>
             )}
-            {data.status === "needs_review" && <span>AI не зміг розв&apos;язати це завдання сам, тому пояснив за ключем. Звір із правилом.</span>}
+            {data.status === "needs_review" && <span>Пояснення складено за правильною відповіддю. Якщо щось викликає сумнів — звір із правилом.</span>}
             <ReportButton taskId={taskId} kind="explanation" />
           </div>
         </div>
