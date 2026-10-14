@@ -4,12 +4,14 @@ import { recordUsage, type Prices } from "../usage";
 import { REFUSAL_NOTE, type Provider, type Tier } from "./types";
 
 const models: Record<Tier, string> = {
-  main: process.env.ANTHROPIC_MODEL_MAIN ?? "claude-sonnet-5-5",
+  main: process.env.ANTHROPIC_MODEL_MAIN ?? "claude-haiku-5-5",
   fast: process.env.ANTHROPIC_MODEL_FAST ?? "claude-haiku-4-5",
 };
 
 const PRICES: Record<string, Prices> = {
-  "claude-sonnet-5-5": [2, 10, 0.2, 2.5],
+  "claude-sonnet-5-5": [2, 10, 0.1, 2.5],
+  // Prompts up to 100K tokens; longer ones cost 5x, which the app's prompts never reach.
+  "claude-haiku-5-5": [0.1, 0.5, 0.01, 0.125],
   "claude-haiku-4-5": [1, 5, 0.1, 1.25],
 };
 
