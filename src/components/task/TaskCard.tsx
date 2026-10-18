@@ -5,6 +5,7 @@ import type { Answer, GoalProgress, TaskDTO, TopicDelta } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { AiPanel } from "./AiPanel";
 import { Feedback } from "./Feedback";
+import { ReportButton } from "./ReportButton";
 import { SaveButtons } from "./SaveButtons";
 import { TopicProgress } from "./TopicProgress";
 import { isComplete, TaskView, type Response } from "./TaskView";
@@ -84,7 +85,14 @@ export function TaskCard({ task, runId, instant, initialResponse = null, initial
         <TaskView task={task} value={value} onChange={setValue} locked={saved} answer={result?.answer} />
       </div>
 
-      {saved && !instant && <p className="rise mt-4 text-sm text-ink-soft">Відповідь збережено. Результат — після завершення.</p>}
+      {/* AI-made tasks can have a wrong key or two right options; once answered, the student can tell. */}
+      {task.source === "generated" && saved && (
+        <div className="mt-3 flex justify-end">
+          <ReportButton taskId={task.id} kind="task" />
+        </div>
+      )}
+
+      {saved && !instant &&<p className="rise mt-4 text-sm text-ink-soft">Відповідь збережено. Результат — після завершення.</p>}
       {error && <p className="mt-3 text-bad">{error}</p>}
 
       {goalReached && (

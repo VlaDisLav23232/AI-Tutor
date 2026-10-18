@@ -18,7 +18,7 @@ function isFocusMode(path: string) {
   return path === "/practice" || (path.startsWith("/run/") && !path.endsWith("/result"));
 }
 
-export function Nav() {
+export function Nav({ admin = false }: { admin?: boolean }) {
   const path = usePathname();
   if (isFocusMode(path)) return null;
   const isActive = (href: string) => path === href || path.startsWith(href + "/");
@@ -41,6 +41,15 @@ export function Nav() {
                 {i.label}
               </Link>
             ))}
+            {admin && (
+              <Link
+                href="/admin/reports"
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm ${isActive("/admin") ? "bg-ink text-on-ink" : "text-ink-soft hover:bg-paper-2"}`}
+              >
+                <Icon name="bang" className="size-4" />
+                Скарги
+              </Link>
+            )}
             <ThemeToggle className="ml-2" />
           </div>
         </nav>
@@ -50,7 +59,14 @@ export function Nav() {
         <Link href="/dashboard" className="font-display text-lg font-bold tracking-tight">
           Бланк
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          {admin && (
+            <Link href="/admin/reports" aria-label="Скарги" className="rounded-lg p-2 text-ink-soft hover:bg-paper-2">
+              <Icon name="bang" className="size-5" />
+            </Link>
+          )}
+          <ThemeToggle />
+        </div>
       </header>
       {/* Mobile: bottom bar */}
       <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-grid bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">

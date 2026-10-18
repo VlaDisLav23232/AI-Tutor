@@ -162,10 +162,16 @@ model Report {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  taskId    String
-  kind      String // task | explanation | ai_reply
-  comment   String?
-  createdAt DateTime @default(now())
+  taskId     String
+  kind       String // task | explanation | ai_reply
+  reason     String? // see REPORT_REASONS in src/lib/reports.ts
+  comment    String?
+  snapshot   Json? // what the student saw: the task (and explanation) at report time
+  status     String    @default("open") // open | resolved | rejected
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([status, createdAt])
 }
 
 // One row per Claude API call, for the spending cap (AI_BUDGET_USD) and cost reporting.

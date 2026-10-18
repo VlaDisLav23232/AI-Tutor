@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import localFont from "next/font/local";
 import { auth } from "@/auth";
 import { Nav } from "@/components/Nav";
+import { isAdminEmail } from "@/lib/admin";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import "./globals.css";
 
@@ -43,7 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="uk" data-theme={theme ?? undefined} className={`${fixelText.variable} ${fixelDisplay.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        {session?.user && <Nav />}
+        {session?.user && <Nav admin={isAdminEmail(session.user.email)} />}
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-28 pt-6 md:pb-12">{children}</main>
       </body>
     </html>
