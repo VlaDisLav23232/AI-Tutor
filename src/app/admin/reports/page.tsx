@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { reasonLabel, REPORT_KIND_LABEL, type ReportStatus } from "@/lib/reports";
-import type { ExplanationContent } from "@/lib/types";
+import { isCurrentExplanation, type ExplanationContent } from "@/lib/types";
 import { Marked, Shape } from "@/components/Marked";
 import { ActionButton } from "./ActionButton";
 import { deleteExplanation, hideGeneratedTask, setGroupStatus } from "./actions";
@@ -33,7 +33,7 @@ interface TaskSnapshot {
 }
 interface Snapshot {
   task: TaskSnapshot;
-  explanation: { content: ExplanationContent; status: string; model: string } | null;
+  explanation: { content: ExplanationContent | LegacyExplanation; status: string; model: string } | null;
 }
 
 const dateFmt = new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -268,9 +268,52 @@ function TaskBlock({ task }: { task: TaskSnapshot }) {
   );
 }
 
-function ExplanationBlock({ content }: { content: ExplanationContent }) {
+/** Explanations written before the v2 format; reports may still point at them. */
+interface LegacyExplanation {
+  rule: string;
+  whyCorrect: string;
+  whyWrong?: Record<string, string>;
+  perItem?: Record<string, string>;
+  tip?: string;
+}
+
+function ExplanationBlock({ content }: { content: ExplanationContent | LegacyExplanation }) {
+  if (!isCurrentExplanation(content)) return <LegacyExplanationBlock content={content} />;
   return (
     <div className="space-y-2 rounded-xl bg-paper-2 p-3 text-[15px]">
+      <ul className="space-y-0.5">
+        {content.options.map((o) => (
+          <li key={o.letter} className={o.correct ? "font-semibold text-good" : ""}>
+            <strong>
+              {o.letter}
+              {o.correct && " ✓"}:
+            </strong>{" "}
+            <Marked text={o.why} rich />
+          </li>
+        ))}
+        {content.items.map((p) => (
+          <li key={p.item}>
+            <strong>
+              {p.item} — {p.letter}
+            </strong>
+            , бо <Marked text={p.why} rich />
+          </li>
+        ))}
+      </ul>
+      {content.takeaway && (
+        <p>
+          <strong>Як запам&apos;ятати: </strong>
+          <Marked text={content.takeaway} rich />
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LegacyExplanationBlock({ content }: { content: LegacyExplanation }) {
+  return (
+    <div className="space-y-2 rounded-xl bg-paper-2 p-3 text-[15px]">
+      <p className="text-xs text-ink-soft">Старий формат: замінюється новим, коли учень наступного разу попросить пояснення.</p>
       <p>
         <strong>Правило: </strong>
         <Marked text={content.rule} />
@@ -292,7 +335,7 @@ function ExplanationBlock({ content }: { content: ExplanationContent }) {
         <details>
           <summary className="cursor-pointer text-ink-soft">Чому не інші варіанти</summary>
           <ul className="mt-1 space-y-0.5">
-            {Object.entries(content.whyWrong).map(([l, why]) => (
+            {Object.entries(content.whyWrong ?? {}).map(([l, why]) => (
               <li key={l}>
                 <strong>{l}:</strong> <Marked text={why} />
               </li>
