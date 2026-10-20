@@ -34,14 +34,16 @@ const WORD_RE = /([А-ЯІЇЄҐа-яіїєґ'’ʼ-]+)/;
  * Explanations write the stressed vowel as a capital («черговИй», «де-Юре»). Shows it lowercase and underlined instead.
  * Only capitals after the first letter count: the first one may just start a sentence; all-caps words are left alone.
  */
+const isStressMark = (ch: string, k: number) => k > 0 && VOWELS.includes(ch.toLowerCase()) && ch !== ch.toLowerCase();
+const hasStressMark = (word: string) => word !== word.toUpperCase() && [...word].some(isStressMark);
+
 function withStress(text: string): ReactNode[] {
   return text.split(WORD_RE).flatMap((part, i): ReactNode[] => {
-    const stressed = (ch: string, k: number) => k > 0 && VOWELS.includes(ch.toLowerCase()) && ch !== ch.toLowerCase();
-    if (!WORD_RE.test(part) || part === part.toUpperCase() || ![...part].some(stressed)) return withShapes(part);
+    if (!WORD_RE.test(part) || !hasStressMark(part)) return withShapes(part);
     return [
       <span key={i}>
         {[...part].map((ch, k) =>
-          stressed(ch, k) ? (
+          isStressMark(ch, k) ? (
             <span key={k} className="mark-letter">
               {ch.toLowerCase()}
             </span>
@@ -69,20 +71,25 @@ function withMarks(text: string, rich: boolean): ReactNode[] {
   );
 }
 
+/** A quoted word or short phrase that gets the same highlighter as ⟦word⟧ in a question. */
+function highlightable(inner: string): boolean {
+  return inner.trim().length > 0 && inner.length <= 40 && !inner.includes("⟦") && !inner.split(WORD_RE).some(hasStressMark);
+}
+
 /**
- * Renders text where ⟦…⟧ marks the fragments underlined on the exam sheet. `rich` is for explanations: the AI uses
- * ⟦…⟧ to highlight what matters, capitalised stresses are underlined (withStress), and «quoted» words — the ones
- * being discussed — are bold, so each line can be scanned at a glance.
+ * Renders text where ⟦…⟧ marks the fragments underlined on the exam sheet. `rich` is for explanations, which use the
+ * same two styles as questions: a letter underlined (⟦я⟧ or a capitalised stress, «черговИй»), a word highlighted
+ * (⟦брати участь⟧, or a short «quoted» word — the one being discussed). A word never gets both, as on the sheet.
  */
 export function Marked({ text, className, rich = false }: { text: string; className?: string; rich?: boolean }) {
   if (!rich) return <span className={className}>{withMarks(text, false)}</span>;
   return (
     <span className={className}>
       {text.split(/(«[^»]*»)/g).map((part, i) =>
-        part.startsWith("«") ? (
-          <strong key={i} className="font-semibold text-ink">
-            {withMarks(part, true)}
-          </strong>
+        part.startsWith("«") && highlightable(part.slice(1, -1)) ? (
+          <Fragment key={i}>
+            «<span className="mark">{withShapes(part.slice(1, -1))}</span>»
+          </Fragment>
         ) : (
           <Fragment key={i}>{withMarks(part, true)}</Fragment>
         ),
