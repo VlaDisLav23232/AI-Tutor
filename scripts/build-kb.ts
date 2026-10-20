@@ -30,7 +30,8 @@ function buildStress(): StressWord[] {
   for (const raw of readFileSync("materials/Наголоси.md", "utf-8").split(/\r?\n/)) {
     const line = raw.trim();
     if (!line.startsWith("*")) continue;
-    let body = line.replace(/^\*\s*/, "").trim();
+    // Markdown escapes (a backslash before "-" in «де-Юре») are not part of the word.
+    let body = line.replace(/^\*\s*/, "").replace(/\\/g, "").trim();
     let note: string | undefined;
     const m = /\(([^)]+)\)\s*$/.exec(body);
     if (m) {

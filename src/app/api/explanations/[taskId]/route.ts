@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { aiRateLimited, jsonError, withUser } from "@/lib/api";
 import { generateExplanation } from "@/lib/ai/explain";
-import { AiUnavailableError, aiEnabled } from "@/lib/ai/client";
+import { AiUnavailableError } from "@/lib/ai/client";
+import { isCurrentExplanation } from "@/lib/types";
 
 type Ctx = { params: Promise<{ taskId: string }> };
 
@@ -14,13 +15,16 @@ async function checkAccess(userId: string, taskId: string) {
   return null;
 }
 
-/** Saved explanation only — never calls the AI. 404 means none has been generated yet. */
+/**
+ * Saved explanation only — never calls the AI. 404 means none yet, or only an old-format (v1) one: those are
+ * regenerated in the new format the next time a student asks, so the switch costs nothing up front.
+ */
 export const GET = withUser(async (userId, _req: Request, ctx: Ctx) => {
   const { taskId } = await ctx.params;
   const denied = await checkAccess(userId, taskId);
   if (denied) return denied;
   const cached = await prisma.explanation.findUnique({ where: { taskId } });
-  if (!cached) return jsonError(404, "Пояснення ще немає");
+  if (!cached || !isCurrentExplanation(cached.content)) return jsonError(404, "Пояснення ще немає");
   return NextResponse.json({ content: cached.content, status: cached.status });
 });
 
@@ -33,9 +37,8 @@ export const POST = withUser(async (userId, _req: Request, ctx: Ctx) => {
   const denied = await checkAccess(userId, taskId);
   if (denied) return denied;
   const cached = await prisma.explanation.findUnique({ where: { taskId } });
-  if (cached) return ndjson([{ type: "done", content: cached.content, status: cached.status }]);
+  if (cached && isCurrentExplanation(cached.content)) return ndjson([{ type: "done", content: cached.content, status: cached.status }]);
   if (aiRateLimited(userId)) return jsonError(429, "Забагато запитів до AI, спробуй пізніше");
-  if (!aiEnabled()) throw new AiUnavailableError();
 
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({

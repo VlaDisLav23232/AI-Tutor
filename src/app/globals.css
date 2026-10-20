@@ -104,8 +104,23 @@ body {
   line-height: 1.6;
 }
 
-/* Exam-style highlighted fragments (⟦…⟧ in the source): a highlighter swipe over the whole glyph.
-   Most marks are a single stressed letter. No negative margins: an overlapping fill would paint over the previous letter. */
+/* A single marked letter (⟦и⟧ in the source, usually a stressed vowel), drawn like the exam sheet underlines it:
+   bold, with a thick marker-coloured underline and a light tint so it stands out without hiding its neighbours.
+   The same style shows stresses inside explanations («черговИй» → черговий with и underlined). */
+.mark-letter {
+  font-weight: 800;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--marker) 28%, transparent);
+  border-radius: 0.18em;
+  text-decoration-line: underline;
+  text-decoration-color: var(--marker);
+  text-decoration-thickness: 0.16em;
+  text-underline-offset: 0.14em;
+  text-decoration-skip-ink: none;
+}
+
+/* Highlighted words and phrases (⟦…⟧ longer than one letter): a highlighter swipe over the whole glyph.
+   No negative margins: an overlapping fill would paint over the previous letter. */
 .mark {
   /* Trim the fill to roughly cap-top..baseline+descent instead of the font's full ascent/descent box. */
   background: linear-gradient(transparent 14%, var(--marker) 14%, var(--marker) 90%, transparent 90%);

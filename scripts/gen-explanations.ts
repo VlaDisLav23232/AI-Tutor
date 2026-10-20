@@ -6,6 +6,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { generateExplanation } from "../src/lib/ai/explain";
 import { AI_PROVIDER, aiEnabled, aiSpentUsd, AI_BUDGET_USD } from "../src/lib/ai/client";
+import { isCurrentExplanation } from "../src/lib/types";
 
 const CONCURRENCY = 5;
 
@@ -14,19 +15,17 @@ async function main() {
   const args = process.argv.slice(2);
   const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : undefined;
   const force = args.includes("--force");
+  // Tasks with no explanation, or only an old-format one (those are replaced).
+  const all = await prisma.task.findMany({ where: { source: "nmt2026" }, select: { id: true, explanation: { select: { content: true } } }, orderBy: { id: "asc" } });
+  const todo = all.filter((t) => force || !isCurrentExplanation(t.explanation?.content));
   if (!limit) {
-    const missing = await prisma.task.count({ where: { source: "nmt2026", explanation: null } });
+    const missing = todo.length;
     console.log(`${missing} tasks have no explanation yet; all of them would cost roughly $${(missing * 0.02).toFixed(0)}–${(missing * 0.03).toFixed(0)}.`);
     console.log("Pass --limit N to explain only N tasks. Otherwise explanations are generated only when a student presses «Пояснити (AI)».");
     return;
   }
 
-  const tasks = await prisma.task.findMany({
-    where: { source: "nmt2026", ...(force ? {} : { explanation: null }) },
-    select: { id: true },
-    orderBy: { id: "asc" },
-    take: limit,
-  });
+  const tasks = todo.slice(0, limit);
   console.log(`explaining ${tasks.length} tasks…`);
 
   let done = 0;

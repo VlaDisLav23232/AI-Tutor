@@ -26,6 +26,18 @@ AI tutor that helps 11th-graders prepare efficiently for the NMT. The MVP covers
   - `submit`: the code checks the answer and that every option is explained. It either rejects the submission with a reason or accepts it, which ends the run.
 
   An accepted submission is marked `verified`. After 2 wrong answers or 5 steps, the explanation is written with the key and marked `needs_review`, and the student is told AI wasn't sure. The usual case is one call (submit right away). The student sees each step live, and results are cached in the DB.
+- **Explanation format (v2).** No textbook rule up front. Each explanation is a short verdict on every option plus a one-sentence takeaway. The screen shows:
+  1. the student's option, if it was wrong;
+  2. the correct option;
+  3. the remaining options;
+  4. «Як запам'ятати».
+
+  The style depends on the topic (`profileOf` in `explain.ts`):
+  - **Stress:** no rules, only mnemonics; the code checks every capitalised stress against the official list.
+  - **Phraseology:** only «1 — Г, бо …» lines, no etymology.
+  - **Spelling, grammar, usage, syntax, sentence order:** each has its own instructions.
+
+  Mnemonics come from [`src/data/kb-mnemonics.json`](src/data/kb-mnemonics.json) (not yet reviewed by a teacher). A stress task whose words all appear in the official list is explained by code, with no AI call. Explanations in the old v1 format are treated as missing and regenerated the next time a student asks.
 - **Rule grounding.** RAG over the Правопис 2019 (`materials/sdm-ukrayinskii-pravopis-vidannia.pdf` → `src/data/rules.json`) supplies the rules.
 - **Generated tasks:**
   - Stress and foreign-word tasks are built deterministically from the knowledge base (`materials/Наголоси.md`, real tasks), with no LLM.

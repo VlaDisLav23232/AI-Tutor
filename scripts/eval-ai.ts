@@ -8,7 +8,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { AI_PROVIDER, aiEnabled } from "../src/lib/ai/client";
 import { generateForCategory } from "../src/lib/ai/generate";
-import type { ExplanationContent } from "../src/lib/types";
+import { isCurrentExplanation } from "../src/lib/types";
 
 async function explanationReport() {
   const rows = await prisma.explanation.findMany({ include: { task: true }, where: { task: { source: "nmt2026" } } });
@@ -31,8 +31,10 @@ async function explanationReport() {
 
   console.log("\nRandom explanations to read:");
   for (const r of rows.sort(() => Math.random() - 0.5).slice(0, 3)) {
-    const c = r.content as unknown as ExplanationContent;
-    console.log(`\n[${r.task.id}] ${r.task.question}\n  key: ${JSON.stringify(r.task.answer)} (${r.status})\n  rule: ${c.rule} ${c.ruleRef ?? ""}\n  why: ${c.whyCorrect}`);
+    const c = r.content;
+    if (!isCurrentExplanation(c)) continue; // old format, regenerated on the next request
+    const lines = [...c.options.map((o) => `${o.letter}${o.correct ? " ✓" : ""}: ${o.why}`), ...c.items.map((p) => `${p.item} — ${p.letter}, бо ${p.why}`)];
+    console.log(`\n[${r.task.id}] ${r.task.question}\n  key: ${JSON.stringify(r.task.answer)} (${r.status})\n  ${lines.join("\n  ")}\n  takeaway: ${c.takeaway ?? "—"}`);
   }
 }
 

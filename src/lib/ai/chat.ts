@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db";
 import { getTaskWithKey } from "@/lib/tasks";
 import { formatRules, retrieveRules } from "@/lib/rag";
-import type { ExplanationContent } from "@/lib/types";
+import { isCurrentExplanation } from "@/lib/types";
 import { AiUnavailableError, aiEnabled, formatAnswer, renderTask, streamText, type ChatTurn } from "./client";
 
 export type { ChatTurn };
@@ -24,7 +24,8 @@ export async function streamTaskChat(opts: {
   if (!found) throw new Error("task not found");
   const { task, answer } = found;
   const explanation = await prisma.explanation.findUnique({ where: { taskId: task.id } });
-  const content = explanation?.content as ExplanationContent | undefined;
+  const content = isCurrentExplanation(explanation?.content) ? explanation.content : undefined;
+  const correct = content?.options.find((o) => o.correct)?.why ?? content?.items.map((p) => `${p.item} — ${p.letter}: ${p.why}`).join("\n");
   const rules = formatRules(retrieveRules(task.categoryLabel, task.question, 2));
 
   const context = [
@@ -33,7 +34,7 @@ export async function streamTaskChat(opts: {
       ? `Учень уже відповів${opts.studentResponse !== undefined ? ` (його відповідь: ${formatAnswer(opts.studentResponse as never)})` : ""}. Можна пояснювати розв'язок повністю.`
       : `Учень ще НЕ відповів. Не називай правильну відповідь і не вказуй на правильний варіант — лише наводь на думку.`,
     `Довідка для тебе (не цитуй і не згадуй джерело):\n${rules}`,
-    content ? `Перевірене пояснення (спирайся на нього):\n${content.rule}\n${content.whyCorrect}` : "",
+    content ? `Перевірене пояснення (спирайся на нього):\n${correct}${content.takeaway ? `\n${content.takeaway}` : ""}` : "",
     renderTask(task, answer),
   ]
     .filter(Boolean)

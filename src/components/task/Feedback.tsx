@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Marked } from "@/components/Marked";
-import type { AgentStep, Answer, ExplanationContent } from "@/lib/types";
+import { orderVerdicts, type AgentStep, type Answer, type ExplanationContent } from "@/lib/types";
 import type { Response } from "./TaskView";
 import { ReportButton } from "./ReportButton";
 import { Icon } from "@/components/Icon";
@@ -83,6 +83,7 @@ export function Feedback({ taskId, response, answer, points, maxPoints }: Props)
   const correct = points === maxPoints;
   const chosen = typeof response === "string" ? response : null;
   const content = data?.content;
+  const { lead, rest } = content ? orderVerdicts(content, chosen) : { lead: [], rest: [] };
 
   return (
     <section aria-live="polite" className={`rise mt-6 rounded-2xl p-4 ${correct ? "bg-good/10" : "bg-bad/10"}`}>
@@ -125,69 +126,57 @@ export function Feedback({ taskId, response, answer, points, maxPoints }: Props)
 
       {content && (
         <div className="mt-3 space-y-3 text-[16px]">
-          {/* The rule comes first; everything below applies it to the options. */}
-          <div className="rounded-xl bg-card p-3 shadow-[0_0_0_1px_var(--grid)]">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
-              <Icon name="book" className="size-4" /> Правило
+          {/* Your wrong option first, then the correct one; the rest below, then how to remember. */}
+          {lead.map((o) => (
+            <p key={o.letter} className={`rounded-xl p-3 ${o.correct ? "bg-good/10" : "bg-bad/10"}`}>
+              <strong>
+                {o.letter} — {o.correct ? "правильно" : "неправильно"}
+                {o.letter === chosen ? " (твоя відповідь)" : ""}:{" "}
+              </strong>
+              <Marked text={o.why} rich />
             </p>
-            <p className="mt-1">
-              <Marked text={content.rule} />
-            </p>
-          </div>
-          {chosen && chosen !== answer && content.whyWrong[chosen] && (
-            <p className="rounded-xl bg-bad/10 p-3">
-              <strong>Чому не {chosen}: </strong>
-              <Marked text={content.whyWrong[chosen]} />
-            </p>
+          ))}
+          {rest.length > 0 && (
+            <div className="text-ink-soft">
+              <p className="text-sm font-semibold">Інші варіанти</p>
+              <ul className="mt-1 space-y-1">
+                {rest.map((o) => (
+                  <li key={o.letter}>
+                    <strong>{o.letter}:</strong> <Marked text={o.why} rich />
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-          <p className="rounded-xl bg-good/10 p-3">
-            <strong>Чому {typeof answer === "string" ? answer : "так"}: </strong>
-            <Marked text={content.whyCorrect} />
-          </p>
-          {content.perItem && (
+          {content.items.length > 0 && (
             <ul className="space-y-1">
-              {Object.entries(content.perItem).map(([n, why]) => {
-                const resp = (response ?? {}) as Record<string, string>;
-                const key = (answer as Record<string, string>)[n];
-                const ok = resp[n] === key;
+              {content.items.map((p) => {
+                const yours = ((response ?? {}) as Record<string, string>)[p.item];
+                const ok = yours === p.letter;
                 return (
-                  <li key={n} className={ok ? "" : "rounded bg-bad/10 px-2 py-1"}>
+                  <li key={p.item} className={ok ? "" : "rounded bg-bad/10 px-2 py-1"}>
                     <strong>
-                      {n} → {key}
+                      {p.item} — {p.letter}
                     </strong>
-                    {!ok && resp[n] && <span className="text-bad"> (у тебе {resp[n]})</span>}: <Marked text={why} />
+                    {!ok && yours && <span className="text-bad"> (у тебе {yours})</span>}, бо <Marked text={p.why} rich />
                   </li>
                 );
               })}
             </ul>
           )}
-          {content.tip && (
+          {content.takeaway && (
             <p className="flex gap-2 rounded-xl bg-marker/30 p-3">
               <Icon name="bolt" className="mt-0.5 size-4 shrink-0" />
               <span>
-                <strong>Порада: </strong>
-                <Marked text={content.tip} />
+                <strong>Як запам&apos;ятати: </strong>
+                <Marked text={content.takeaway} rich />
               </span>
             </p>
-          )}
-          {Object.keys(content.whyWrong).some((l) => l !== chosen) && (
-            <details className="text-ink-soft">
-              <summary className="cursor-pointer">Чому не підходять інші варіанти</summary>
-              <ul className="mt-2 space-y-1">
-                {Object.entries(content.whyWrong)
-                  .filter(([l]) => l !== chosen)
-                  .map(([l, why]) => (
-                    <li key={l}>
-                      <strong>{l}:</strong> <Marked text={why} />
-                    </li>
-                  ))}
-              </ul>
-            </details>
           )}
           <div className="flex flex-wrap items-center gap-3 text-sm text-ink-soft">
             {data.status === "verified" && (
               <span className="flex items-center gap-1 text-good">
-                <Icon name="check" className="size-4" /> Розв&apos;язок AI збігся з ключем
+                <Icon name="check" className="size-4" /> Перевірено за ключем
               </span>
             )}
             {data.status === "needs_review" && <span>Пояснення складено за правильною відповіддю. Якщо щось викликає сумнів — звір із правилом.</span>}

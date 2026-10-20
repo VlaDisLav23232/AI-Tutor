@@ -78,7 +78,9 @@ describe("knowledge-base generators", () => {
       expect(Object.keys(d.options)).toHaveLength(4);
       expect(d.options[d.answer as string]).toBeDefined();
       for (const row of Object.values(d.options)) expect(row.match(/⟦/g)).toHaveLength(3);
-      expect(d.explanation?.whyCorrect).toContain("неправильно");
+      // Explained from the official list: the answer row is the only one with a mistake.
+      expect(d.explanation?.options.find((o) => o.correct)?.letter).toBe(d.answer);
+      expect(d.explanation?.options.find((o) => o.correct)?.why).toContain("помилка");
     }
   });
 
@@ -86,7 +88,7 @@ describe("knowledge-base generators", () => {
     const d = generateForeignDraft();
     expect(Object.keys(d.options)).toHaveLength(4);
     expect(new Set(Object.values(d.options)).size).toBe(4);
-    expect(d.explanation?.whyCorrect).toContain(d.options[d.answer as string]);
+    expect(d.explanation?.options.find((o) => o.correct)?.why).toContain(d.options[d.answer as string]);
   });
 });
 

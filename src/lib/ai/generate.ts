@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { toDTO } from "@/lib/tasks";
 import { formatRules, retrieveRules } from "@/lib/rag";
 import { LETTERS, type Answer, type ExplanationContent, type TaskDTO } from "@/lib/types";
+import { explainStressFromKb } from "@/lib/hints";
 import stressKb from "@/data/kb-stress.json";
 import idiomKb from "@/data/kb-idioms.json";
 import foreignKb from "@/data/kb-foreign.json";
@@ -66,11 +67,10 @@ function markStress(w: StressWord, vowelIndex: number): string {
   const word = w.word;
   return word.slice(0, vowelIndex) + `⟦${word[vowelIndex]}⟧` + word.slice(vowelIndex + 1);
 }
-const showCorrect = (w: StressWord) =>
-  [...w.word].map((ch, i) => (w.stressed.includes(i) ? ch.toUpperCase() : ch)).join("");
-
 function wrongVowel(w: StressWord): number | null {
-  const candidates = [...w.word].map((ch, i) => (VOWELS.includes(ch) && !w.stressed.includes(i) ? i : -1)).filter((i) => i >= 0);
+  // Homonyms (вИгода / вигОда) have two valid stresses: a planted mistake must be wrong for both.
+  const valid = (stressKb as StressWord[]).filter((x) => x.word === w.word).flatMap((x) => x.stressed);
+  const candidates = [...w.word].map((ch, i) => (VOWELS.includes(ch) && !valid.includes(i) ? i : -1)).filter((i) => i >= 0);
   return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
 }
 
@@ -84,26 +84,15 @@ export function generateStressDraft(): Draft {
   const badWordIdx = Math.floor(Math.random() * 3);
   words.splice(badRow * 3 + badWordIdx, 0, bad);
   const rows = [0, 1, 2, 3].map((r) => words.slice(r * 3, r * 3 + 3));
+  const badIndex = wrongVowel(bad)!;
   const options: Record<string, string> = {};
-  const whyWrong: Record<string, string> = {};
   rows.forEach((row, r) => {
-    const rendered = row.map((w) => markStress(w, w === bad ? wrongVowel(w)! : w.stressed[0]));
-    options[LETTERS[r]] = rendered.join(", ");
-    if (r !== badRow) whyWrong[LETTERS[r]] = `У цьому рядку всі наголоси правильні: ${row.map(showCorrect).join(", ")}.`;
+    options[LETTERS[r]] = row.map((w) => markStress(w, w === bad ? badIndex : w.stressed[0])).join(", ");
   });
-  return {
-    categoryLabel: "stress",
-    format: "single",
-    question: "Правильно виділено букви на позначення наголошених голосних у всіх словах, ОКРІМ рядка",
-    options,
-    answer: LETTERS[badRow],
-    explanation: {
-      rule: "Наголос у словах з орфоепічного мінімуму НМТ потрібно запам'ятати: правильну форму перевіряють за орфоепічним словником.",
-      ruleRef: null,
-      whyCorrect: `У рядку ${LETTERS[badRow]} наголос позначено неправильно в слові «${bad.word}»: правильно — ${showCorrect(bad)}${bad.note ? ` (${bad.note})` : ""}.`,
-      whyWrong,
-    },
-  };
+  const question = "Правильно виділено букви на позначення наголошених голосних у всіх словах, ОКРІМ рядка";
+  const answer = LETTERS[badRow];
+  // Every word comes from the official list, so the explanation is built from it with no AI call.
+  return { categoryLabel: "stress", format: "single", question, options, answer, explanation: explainStressFromKb({ question, options }, answer) ?? undefined };
 }
 
 export function generateForeignDraft(): Draft {
@@ -121,14 +110,14 @@ export function generateForeignDraft(): Draft {
     options,
     answer,
     explanation: {
-      rule: "Іншомовні слова часто мають питомо українські відповідники з тим самим значенням.",
-      ruleRef: null,
-      whyCorrect: `«${entry.word}» означає те саме, що «${entry.equivalent}».`,
-      whyWrong: Object.fromEntries(
-        Object.entries(options)
-          .filter(([l]) => l !== answer)
-          .map(([l, o]) => [l, `«${o}» має інше значення, ніж «${entry.word}».`]),
-      ),
+      v: 2,
+      options: Object.entries(options).map(([letter, o]) => ({
+        letter,
+        correct: letter === answer,
+        why: letter === answer ? `«${entry.word}» означає те саме, що «${o}».` : `«${o}» має інше значення, ніж «${entry.word}».`,
+      })),
+      items: [],
+      takeaway: null,
     },
   };
 }
@@ -158,14 +147,13 @@ async function generatePhraseologyDraft(): Promise<Draft | null> {
   const letterOf = (idiom: string) => LETTERS[optionOrder.findIndex((i) => i.idiom === idiom)];
   const items: Record<string, string> = {};
   const answer: Record<string, string> = {};
-  const perItem: Record<string, string> = {};
+  const itemVerdicts: ExplanationContent["items"] = [];
   used.forEach((idiom, k) => {
     const s = out.sentences.find((x) => x.idiom.trim().toLowerCase() === idiom.idiom.toLowerCase()) ?? out.sentences[k];
     items[String(k + 1)] = s.sentence;
     answer[String(k + 1)] = letterOf(idiom.idiom);
-    perItem[String(k + 1)] = `${letterOf(idiom.idiom)} — «${idiom.idiom}»: ${idiom.meaning}`;
+    itemVerdicts.push({ item: String(k + 1), letter: letterOf(idiom.idiom), why: `«${idiom.idiom}» — це ${idiom.meaning.replace(/\.$/, "")}` });
   });
-  const spare = idioms[4];
   return {
     categoryLabel: "phraseology_matching",
     format: "matching",
@@ -173,13 +161,7 @@ async function generatePhraseologyDraft(): Promise<Draft | null> {
     items,
     options,
     answer,
-    explanation: {
-      rule: "Фразеологізм добирають за значенням: воно має відповідати змісту речення.",
-      ruleRef: null,
-      whyCorrect: "Значення кожного фразеологізму збігається зі змістом відповідного речення.",
-      whyWrong: { [letterOf(spare.idiom)]: `«${spare.idiom}» — ${spare.meaning}; жодне речення цього змісту не має.` },
-      perItem,
-    },
+    explanation: { v: 2, options: [], items: itemVerdicts, takeaway: null },
   };
 }
 
