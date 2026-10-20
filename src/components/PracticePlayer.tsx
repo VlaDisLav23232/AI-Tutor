@@ -32,9 +32,10 @@ interface Props {
   categoryNames: Record<string, string>;
   todayCount: number;
   dailyGoal: number;
+  totalCount: number;
 }
 
-export function PracticePlayer({ runId: initialRunId, focus, categoryNames, todayCount: initialToday, dailyGoal }: Props) {
+export function PracticePlayer({ runId: initialRunId, focus, categoryNames, todayCount: initialToday, dailyGoal, totalCount: initialTotal }: Props) {
   const router = useRouter();
   const [runId, setRunId] = useState(initialRunId);
   const [task, setTask] = useState<TaskDTO | null>(null);
@@ -43,6 +44,7 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState(initialToday);
+  const [total, setTotal] = useState(initialTotal);
   const [stats, setStats] = useState({ done: 0, correct: 0, combo: 0, bestCombo: 0 });
   const [topics, setTopics] = useState<Record<string, TopicSession>>({});
   const [showSummary, setShowSummary] = useState(false);
@@ -86,7 +88,11 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
       const combo = result.correct ? s.combo + 1 : 0;
       return { done: s.done + 1, correct: s.correct + (result.correct ? 1 : 0), combo, bestCombo: Math.max(s.bestCombo, combo) };
     });
-    if (result.goal) setToday(result.goal.todayCount);
+    if (result.goal) {
+      const added = result.goal.todayCount - today;
+      setToday(result.goal.todayCount);
+      if (added > 0) setTotal((t) => t + added);
+    }
     const t = result.topic;
     if (t) {
       setTopics((all) => ({
@@ -132,9 +138,14 @@ export function PracticePlayer({ runId: initialRunId, focus, categoryNames, toda
                 <Icon name="bolt" className="size-4" filled />×{stats.combo}
               </span>
             )}
-            <span className="relative grid place-items-center" title={`Сьогодні ${today} з ${dailyGoal}`}>
+            <span className="relative grid place-items-center" title={`Сьогодні ${today} (ціль ${dailyGoal})`}>
               <GoalRing count={today} goal={dailyGoal} size={36} />
-              <span className="absolute font-display text-[10px] font-bold tabular-nums">{Math.min(today, dailyGoal)}</span>
+              <span className="absolute font-display text-[10px] font-bold tabular-nums">{today}</span>
+            </span>
+            <span className="text-xs leading-tight text-ink-soft tabular-nums" title="Завдань розв'язано за весь час">
+              усього
+              <br />
+              <strong className="text-sm text-ink">{total}</strong>
             </span>
           </div>
         </div>

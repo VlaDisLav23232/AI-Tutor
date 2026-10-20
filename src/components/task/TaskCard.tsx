@@ -105,9 +105,9 @@ export function TaskCard({ task, runId, instant, initialResponse = null, initial
       {result?.topic && <TopicProgress topic={result.topic} />}
       {instant && saved && <AiPanel taskId={task.id} runId={runId} offerSimilar={!!result && !result.correct} onSimilar={onSimilar} />}
 
-      {/* Bottom action bar: within thumb reach on phones. */}
+      {/* Bottom action bar: stays on screen while the explanation is read, so «Наступне» never needs a scroll. */}
       {(!saved || next) && (
-        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-grid bg-paper/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:backdrop-blur-none">
+        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-grid bg-paper/95 px-4 py-3 backdrop-blur">
           {!saved ? (
             <button type="button" disabled={busy || !isComplete(task, value)} onClick={submit} className={barButton}>
               {busy ? "Перевіряю…" : instant ? "Перевірити" : "Зберегти відповідь"}

@@ -20,6 +20,7 @@ export default async function Practice({ searchParams }: { searchParams: Promise
       categoryNames={Object.fromEntries(categories.map((c) => [c.label, c.nameUa]))}
       todayCount={streak.todayCount}
       dailyGoal={streak.dailyGoal}
+      totalCount={streak.totalCount}
     />
   );
 }

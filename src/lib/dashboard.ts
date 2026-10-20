@@ -51,6 +51,8 @@ export interface StreakInfo {
   best: number;
   todayCount: number;
   dailyGoal: number;
+  /** Tasks answered on all days. */
+  totalCount: number;
   /** Last 7 days, oldest first. */
   week: { date: string; count: number; goalMet: boolean; isToday: boolean }[];
 }
@@ -58,9 +60,10 @@ export interface StreakInfo {
 export async function getStreak(userId: string): Promise<StreakInfo> {
   const today = kyivDate();
   const dates = Array.from({ length: 7 }, (_, i) => shiftDay(today, i - 6));
-  const [user, days] = await Promise.all([
+  const [user, days, total] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
     prisma.dayActivity.findMany({ where: { userId, date: { in: dates } } }),
+    prisma.dayActivity.aggregate({ where: { userId }, _sum: { count: true } }),
   ]);
   const byDate = Object.fromEntries(days.map((d) => [d.date, d.count]));
   const current = currentStreak(user.streak, user.lastActiveDate, today);
@@ -69,6 +72,7 @@ export async function getStreak(userId: string): Promise<StreakInfo> {
     best: Math.max(user.bestStreak, current),
     todayCount: byDate[today] ?? 0,
     dailyGoal: DAILY_GOAL,
+    totalCount: total._sum.count ?? 0,
     week: dates.map((date) => ({ date, count: byDate[date] ?? 0, goalMet: (byDate[date] ?? 0) >= DAILY_GOAL, isToday: date === today })),
   };
 }

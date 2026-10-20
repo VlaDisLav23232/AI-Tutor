@@ -47,12 +47,14 @@ export function StreakCard({ streak }: { streak: StreakInfo }) {
           <p className="font-display text-3xl font-bold tabular-nums leading-none">
             {streak.current} <span className="text-base font-semibold">{dayWord(streak.current)}</span>
           </p>
-          <p className="mt-1 text-sm text-ink-soft">Рекорд: {streak.best}</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            Рекорд: {streak.best} · Усього: <span className="tabular-nums">{streak.totalCount}</span> {plural(streak.totalCount)}
+          </p>
         </div>
         <div className="relative grid place-items-center">
           <GoalRing count={streak.todayCount} goal={streak.dailyGoal} size={52} />
           <span className="absolute font-display text-xs font-bold tabular-nums">
-            {Math.min(streak.todayCount, streak.dailyGoal)}/{streak.dailyGoal}
+            {streak.todayCount}/{streak.dailyGoal}
           </span>
         </div>
       </div>

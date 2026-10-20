@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TopicRow } from "@/lib/dashboard";
 import { shortName } from "@/lib/topicName";
-import { Icon } from "./Icon";
 import { LEVEL_TEXT, ScoreGauge } from "./ScoreGauge";
 
 /** A topic as a compact tile; tapping it starts a 10-task test on that topic. */
@@ -34,11 +33,6 @@ export function TopicTile({ topic }: { topic: TopicRow }) {
     >
       <span className="flex items-start gap-2">
         <span className="flex-1 text-[15px] font-semibold leading-snug">{shortName(topic.nameUa)}</span>
-        {topic.dueForReview && (
-          <span className="shrink-0 rounded-full bg-marker/40 px-2 py-0.5 text-[11px] font-semibold" title="Пора повторити">
-            <Icon name="repeat" className="inline size-3" /> повтор
-          </span>
-        )}
       </span>
       <span className="block">
         <span className="mb-1.5 flex items-baseline justify-between">
