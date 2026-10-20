@@ -18,7 +18,7 @@ AI tutor that helps 11th-graders prepare efficiently for the NMT. The MVP covers
 
 ## How it works
 
-- **Tasks.** 393 real NMT 2026 tasks come from `materials/nmt_2026_tasks_by_category.json`. Only the task fields are used; the explanations in that file are ignored.
+- **Tasks.** 399 real NMT 2026 tasks come from `materials/nmt_2026_tasks_by_category.json`. Only the task fields are used; the explanations in that file are ignored.
 - **Exam layout.** How often each topic appears at each exam position is computed from the tasks and used to build realistic NMT variants.
 - **Explanations (agent).** «Пояснити (AI)» runs an explanation agent ([`src/lib/ai/explain.ts`](src/lib/ai/explain.ts)). The model never sees the key. At each step it picks one action:
   - `search_rules`: search the Правопис with its own query (free, local).

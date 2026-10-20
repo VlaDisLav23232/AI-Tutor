@@ -11,6 +11,7 @@
     "test": "vitest run",
     "db:push": "prisma db push",
     "db:seed": "tsx scripts/seed.ts",
+    "db:clear-ai": "tsx scripts/clear-ai.ts",
     "build:kb": "tsx scripts/build-kb.ts",
     "build:rules": "tsx scripts/build-rules.ts",
     "ai:explain": "tsx scripts/gen-explanations.ts",

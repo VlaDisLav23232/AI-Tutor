@@ -1,22 +1,23 @@
 // Loads real NMT 2026 tasks into the DB. Only task fields are used: the source `explanation`
 // field is ignored on purpose (explanations are regenerated and verified by AI).
-// Safe to re-run: it updates tasks in place and never deletes progress or explanations.
-// Run: npx tsx scripts/seed.ts
+// Safe to re-run: it updates tasks in place. Real tasks that are no longer in the file are deleted
+// together with their attempts and AI twins; everything else (progress, explanations) is kept.
+// Run: npm run db:seed (uses DATABASE_URL)
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { prisma } from "../src/lib/db";
-import { parseInlineOptions, parseMatchingText, stripPageDebris } from "../src/lib/parse";
+import { dbLabel, deleteTasks } from "./delete-tasks";
 
 type RawOption = string | { sentences: string; text: string };
 interface RawTask {
   id: string;
   session: string;
   position: number;
-  question?: string;
-  text?: string;
+  question: string;
   passage?: { shape: string; text: string }[];
-  options?: Record<string, RawOption>;
-  answer: string | string[] | Record<string, string>;
+  items?: Record<string, string>; // matching tasks only
+  options: Record<string, RawOption>;
+  answer: string | Record<string, string>;
 }
 interface RawFile {
   groups: { group: string; categories: { label: string; name_ua: string; tasks: RawTask[] }[] }[];
@@ -54,37 +55,26 @@ async function main() {
     for (const c of g.categories) {
       categories.set(c.label, { nameUa: c.name_ua, group: g.group, count: 0 });
       for (const t of c.tasks) {
-        // Two answers means the collection merged two tasks into one; unusable.
-        if (Array.isArray(t.answer)) {
-          skipped.push(`${t.id} (two answers)`);
-          continue;
-        }
         const base = { id: t.id, categoryLabel: c.label, position: t.position, session: t.session };
 
         if (typeof t.answer === "object") {
-          const parsed = t.text ? parseMatchingText(t.text) : null;
-          if (!parsed) {
-            skipped.push(`${t.id} (matching parse)`);
+          const options = t.options as Record<string, string>;
+          const items = t.items ?? {};
+          if (Object.entries(t.answer).some(([n, letter]) => !items[n] || !options[letter])) {
+            skipped.push(`${t.id} (items/options do not match the answer)`);
             continue;
           }
-          tasks.push({ ...base, format: "matching", ...parsed, answer: t.answer });
+          tasks.push({ ...base, format: "matching", question: t.question, items, options, answer: t.answer });
         } else {
-          let question = t.question ?? "";
-          let options: Record<string, string> | null = null;
-          if (t.options) {
-            options = Object.fromEntries(Object.entries(t.options).map(([k, v]) => [k, normalizeOption(v, !!t.passage?.length)]));
-          } else if (t.text) {
-            const parsed = parseInlineOptions(t.text);
-            if (parsed) ({ question, options } = parsed);
-          }
-          if (!options || Object.keys(options).length < 4 || !(t.answer in options)) {
+          const options = Object.fromEntries(Object.entries(t.options).map(([k, v]) => [k, normalizeOption(v, !!t.passage?.length)]));
+          if (Object.keys(options).length < 4 || !(t.answer in options)) {
             skipped.push(`${t.id} (options)`);
             continue;
           }
           tasks.push({
             ...base,
             format: c.label === "sentence_order" ? "order" : "single",
-            question,
+            question: t.question,
             passage: t.passage,
             options,
             answer: t.answer,
@@ -111,9 +101,6 @@ async function main() {
     m.set(t.position, (m.get(t.position) ?? 0) + 1);
   }
 
-  // Re-running the seed only upserts tasks and categories: students' answers, progress and the
-  // (paid) AI explanations are never deleted.
-
   // How often each topic appears at each exam position; used to build realistic NMT variants.
   for (const [label, info] of categories) {
     const shares: Record<string, number> = {};
@@ -129,22 +116,22 @@ async function main() {
     await prisma.category.upsert({ where: { label }, create: { label, ...data }, update: data });
   }
 
-  const clean = (o?: object) => o && Object.fromEntries(Object.entries(o).map(([k, v]) => [k, stripPageDebris(String(v))]));
   for (const t of tasks) {
-    const data = {
-      ...t,
-      question: stripPageDebris(t.question),
-      options: clean(t.options)!,
-      items: clean(t.items),
-      source: "nmt2026",
-      verified: true,
-    };
+    const data = { ...t, source: "nmt2026", verified: true };
     await prisma.task.upsert({ where: { id: t.id }, create: data, update: data });
   }
 
+  // Real tasks dropped from the file (e.g. ones whose correct option the collection never reproduced).
+  const keep = new Set(tasks.map((t) => t.id));
+  const stale = (await prisma.task.findMany({ where: { source: "nmt2026" }, select: { id: true } })).map((t) => t.id).filter((id) => !keep.has(id));
+  const removed = await deleteTasks(stale);
+
+  console.log(`database: ${dbLabel()}`);
+
   console.log(`categories: ${categories.size}`);
   console.log(`tasks: ${tasks.length} (single ${tasks.filter((t) => t.format === "single").length}, order ${tasks.filter((t) => t.format === "order").length}, matching ${tasks.filter((t) => t.format === "matching").length})`);
-  console.log(`skipped ${skipped.length}: ${skipped.join(", ")}`);
+  console.log(`removed ${removed} tasks no longer in the file${stale.length ? `: ${stale.join(", ")}` : ""}`);
+  if (skipped.length) console.log(`skipped ${skipped.length}: ${skipped.join(", ")}`);
 }
 
 main()
