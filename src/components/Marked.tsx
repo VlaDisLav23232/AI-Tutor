@@ -44,7 +44,7 @@ function withStress(text: string): ReactNode[] {
       <span key={i}>
         {[...part].map((ch, k) =>
           isStressMark(ch, k) ? (
-            <span key={k} className="mark-letter">
+            <span key={k} className="mark">
               {ch.toLowerCase()}
             </span>
           ) : (
@@ -59,44 +59,37 @@ function withStress(text: string): ReactNode[] {
 /**
  * One ⟦…⟧ fragment. Punctuation and spaces caught inside the mark by the PDF extraction (⟦я,⟧) stay outside it, so a
  * marked letter is always drawn as a letter; marks with digits are extraction debris (⟦04 червня 2026⟧) and drop.
- * In explanations the AI sometimes marks a word that also carries a capitalised stress (⟦фартУх⟧); such a word gets
- * only the letter underline, never both styles at once.
  */
-function markNode(inner: string, rich: boolean, key: number): ReactNode {
+function markNode(inner: string, key: number): ReactNode {
   const [, lead, core, trail] = /^([^A-Za-zА-ЯІЇЄҐа-яіїєґ]*)([\s\S]*?)([^A-Za-zА-ЯІЇЄҐа-яіїєґ]*)$/.exec(inner)!;
   if (!core || /\d/.test(inner)) return <span key={key}>{withShapes(inner)}</span>;
-  const body =
-    rich && core.split(WORD_RE).some(hasStressMark) ? (
-      withStress(core)
-    ) : (
-      <span className={[...core].length === 1 ? "mark-letter" : "mark"}>{withShapes(core)}</span>
-    );
   return (
     <span key={key}>
       {lead}
-      {body}
+      <span className="mark">{withShapes(core)}</span>
       {trail}
     </span>
   );
 }
 
-function withMarks(text: string, rich: boolean): ReactNode[] {
+function withMarks(text: string): ReactNode[] {
   return text.split(/(⟦[^⟧]*⟧)/g).map((p, i) =>
     p.startsWith("⟦") ? (
-      markNode(p.slice(1, -1), rich, i)
+      markNode(p.slice(1, -1), i)
     ) : (
       <span key={i} className="whitespace-pre-line">
-        {rich ? withStress(p) : withShapes(p)}
+        {withShapes(p)}
       </span>
     ),
   );
 }
 
 /**
- * Renders text where ⟦…⟧ marks the fragments underlined on the exam sheet: a letter is underlined, a longer fragment
- * highlighted. `rich` is for explanations: they use the same two styles, and a capitalised stress («черговИй») is
- * shown lowercase with the letter underlined. Quoted words stay plain — only what the AI marks is highlighted.
+ * Renders text where ⟦…⟧ marks the fragments underlined on the exam sheet, letters and words alike. `rich` is for
+ * explanations: they carry no ⟦…⟧ marks (any left are dropped), only a capitalised stress («черговИй»), shown
+ * lowercase with the letter marked.
  */
 export function Marked({ text, className, rich = false }: { text: string; className?: string; rich?: boolean }) {
-  return <span className={className}>{withMarks(text, rich)}</span>;
+  if (!rich) return <span className={className}>{withMarks(text)}</span>;
+  return <span className={`whitespace-pre-line ${className ?? ""}`}>{withStress(text.replace(/[⟦⟧]/g, ""))}</span>;
 }

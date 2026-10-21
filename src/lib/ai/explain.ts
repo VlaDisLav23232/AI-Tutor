@@ -75,7 +75,7 @@ const FORMAT = `Формат пояснення:
 - options: для КОЖНОГО варіанта — letter, correct (true лише для правильного) і why: 1–2 короткі речення по суті, з конкретним словом чи місцем із варіанта. Не переказуй підручник і не починай з визначень: пиши живо, на «ти», як репетитор.
 - takeaway: одне речення, яке учень застосує на іспиті.
 - Для завдань на відповідність замість options заповни items: для кожного пункту — item, letter і why (продовження фрази «1 — Г, бо …», без самого «бо»).
-- Виділяй найважливіше дужками ⟦…⟧, щоб учень одразу побачив суть: букву, яка все вирішує (зап'⟦я⟧стний), або слово з помилкою чи правильну форму (⟦брати участь⟧). Не більше двох виділень у варіанті, лише окремі букви чи 1–3 слова, не цілі речення. Слова, про які говориш, бери в лапки «…».
+- Нічого не виділяй дужками ⟦…⟧. Слова, про які говориш, бери в лапки «…».
 Не згадуй, звідки правило, не пиши «§» і «правопис».`;
 
 // ---------- Output schemas ----------
@@ -171,13 +171,10 @@ export function missingParts(out: ExplanationOutput, task: TaskDTO, key: Answer,
 }
 
 /**
- * Keeps the model's ⟦…⟧ highlights only where they help: drops all of them if the brackets don't pair up, and unwraps
- * any highlight longer than a short phrase (a highlighted sentence highlights nothing).
+ * Explanations carry no ⟦…⟧ marks: drops any the model wrote anyway (often copied from the task text).
  */
 export function cleanMarks(text: string): string {
-  const opens = (text.match(/⟦/g) ?? []).length;
-  if (opens !== (text.match(/⟧/g) ?? []).length) return text.replace(/[⟦⟧]/g, "");
-  return text.replace(/⟦([^⟧]*)⟧/g, (m, inner: string) => (inner.length > 40 || !inner.trim() ? inner : m));
+  return text.replace(/[⟦⟧]/g, "");
 }
 
 /** Normalises a checked submission: verdicts follow the key, empty fields become null. */

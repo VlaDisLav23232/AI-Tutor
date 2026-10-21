@@ -316,17 +316,17 @@ function LegacyExplanationBlock({ content }: { content: LegacyExplanation }) {
       <p className="text-xs text-ink-soft">Старий формат: замінюється новим, коли учень наступного разу попросить пояснення.</p>
       <p>
         <strong>Правило: </strong>
-        <Marked text={content.rule} />
+        <Marked text={content.rule} rich />
       </p>
       <p>
         <strong>Чому так: </strong>
-        <Marked text={content.whyCorrect} />
+        <Marked text={content.whyCorrect} rich />
       </p>
       {content.perItem && (
         <ul className="space-y-0.5">
           {Object.entries(content.perItem).map(([n, why]) => (
             <li key={n}>
-              <strong>{n}:</strong> <Marked text={why} />
+              <strong>{n}:</strong> <Marked text={why} rich />
             </li>
           ))}
         </ul>
@@ -337,7 +337,7 @@ function LegacyExplanationBlock({ content }: { content: LegacyExplanation }) {
           <ul className="mt-1 space-y-0.5">
             {Object.entries(content.whyWrong ?? {}).map(([l, why]) => (
               <li key={l}>
-                <strong>{l}:</strong> <Marked text={why} />
+                <strong>{l}:</strong> <Marked text={why} rich />
               </li>
             ))}
           </ul>
@@ -346,7 +346,7 @@ function LegacyExplanationBlock({ content }: { content: LegacyExplanation }) {
       {content.tip && (
         <p>
           <strong>Порада: </strong>
-          <Marked text={content.tip} />
+          <Marked text={content.tip} rich />
         </p>
       )}
     </div>

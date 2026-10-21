@@ -9,7 +9,6 @@
   --ink-soft: #4a5788;
   --grid: #c9d3ea;
   --marker: #86c0f6;
-  --on-marker: #1b2a6b;
   --bad: #d2302c;
   --good: #1e7a4c;
   --on-ink: #ffffff;
@@ -30,7 +29,6 @@
     --ink-soft: #a9b3d6;
     --grid: #33406e;
     --marker: #f2cf3c;
-    --on-marker: #10162e;
     --bad: #ff6b63;
     --good: #4cc98a;
     --on-ink: #10162e;
@@ -51,7 +49,6 @@
   --ink-soft: #a9b3d6;
   --grid: #33406e;
   --marker: #3c7ff2;
-  --on-marker: #10162e;
   --bad: #ff6b63;
   --good: #4cc98a;
   --on-ink: #10162e;
@@ -104,22 +101,9 @@ body {
   line-height: 1.6;
 }
 
-/* A single marked letter (⟦и⟧ in the source, usually a stressed vowel), drawn like the exam sheet underlines it:
-   bold, with a thick marker-coloured underline and a light tint so it stands out without hiding its neighbours.
-   The same style shows stresses inside explanations («черговИй» → черговий with и underlined). */
-.mark-letter {
-  font-weight: 800;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--marker) 28%, transparent);
-  border-radius: 0.18em;
-  text-decoration-line: underline;
-  text-decoration-color: var(--marker);
-  text-decoration-thickness: 0.16em;
-  text-underline-offset: 0.14em;
-  text-decoration-skip-ink: none;
-}
-
-/* Highlighted words and phrases (⟦…⟧ longer than one letter): the same style as a marked letter.
+/* Marked letters and words (⟦и⟧, ⟦брати участь⟧ in the source), drawn like the exam sheet underlines them: bold,
+   with a thick marker-coloured underline and a light tint so they stand out without hiding their neighbours.
+   The same style shows stresses inside explanations («черговИй» → черговий with и marked).
    box-decoration-break keeps the tint and rounding on each line when a phrase wraps. */
 .mark {
   font-weight: 800;
